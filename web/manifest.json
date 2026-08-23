@@ -1,0 +1,9 @@
+{
+  "name": "Sorting Sandbox",
+  "short_name": "Sorting Sandbox",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f8fbf4",
+  "theme_color": "#356b39",
+  "description": "Explore, race and analyze sorting algorithms written by a class."
+}

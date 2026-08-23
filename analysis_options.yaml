@@ -1,0 +1,9 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    # Generated worker copies are validated before they are moved here.
+    - worker/generated/**
+    # Nested packages/repos have their own analysis pass in ./check.
+    - algorithms/**
+    - packages/**

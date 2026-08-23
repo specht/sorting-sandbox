@@ -1,0 +1,11 @@
+name: sorting_sandbox_api
+description: Tiny student-facing API for Sorting Sandbox algorithms.
+version: 2.0.0-dev.1
+publish_to: none
+
+environment:
+  sdk: '>=3.11.0 <4.0.0'
+
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.26.0

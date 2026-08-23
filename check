@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+
+command -v flutter >/dev/null 2>&1 || { echo "flutter was not found in PATH" >&2; exit 127; }
+command -v dart >/dev/null 2>&1 || { echo "dart was not found in PATH" >&2; exit 127; }
+
+echo "==> Application dependencies"
+flutter pub get
+
+echo "==> Flutter analysis"
+flutter analyze
+
+echo "==> Flutter tests"
+flutter test
+
+echo "==> Student API package"
+(
+  cd packages/sorting_sandbox_api
+  dart pub get
+  dart analyze
+  dart test
+)
+
+echo "==> Example/class algorithm repository"
+(
+  cd algorithms
+  dart pub get
+  dart analyze
+)
+
+echo "==> Algorithm validation, instrumentation and worker compilation"
+dart run tool/prepare_algorithms.dart --repo "$ROOT/algorithms" --compile-worker --no-pub-get
+
+echo "✓ All checks passed"

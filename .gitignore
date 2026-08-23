@@ -1,0 +1,17 @@
+.dart_tool/
+.packages
+.pub/
+build/
+
+# The class algorithm repository is a separate nested Git repository.
+/algorithms/
+
+# Generated classroom runtime. The static Flutter app never imports student code.
+/runtime/*
+!/runtime/.gitkeep
+
+worker/generated/*
+!worker/generated/.gitkeep
+!worker/generated/registry.g.dart
+worker/generated_next/
+worker/main_next.dart

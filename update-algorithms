@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+
+if ! git -C "$ROOT/algorithms" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  echo "algorithms/ is not a Git repository yet." >&2
+  echo "Initialize it or clone your class repository into $ROOT/algorithms." >&2
+  exit 2
+fi
+
+exec git -C "$ROOT/algorithms" pull "$@"
