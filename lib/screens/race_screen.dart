@@ -18,8 +18,8 @@ class RaceScreen extends StatefulWidget {
 
 class _RaceLane {
   _RaceLane(this.algorithm, List<int> initial)
-      : numbers = List<int>.from(initial),
-        scratch = List<int>.filled(initial.length, 0);
+    : numbers = List<int>.from(initial),
+      scratch = List<int>.filled(initial.length, 0);
 
   final AlgorithmMeta algorithm;
   List<int> numbers;
@@ -38,12 +38,29 @@ class _RaceScreenState extends State<RaceScreen> {
   final Set<String> _selected = {};
   final List<_RaceLane> _lanes = [];
   bool _running = false;
-  int _n = 40;
+  int _n = 48;
   int _speed = 3;
   InputShape _shape = InputShape.random;
   int _seed = 100;
   bool _catalogUpdatePending = false;
 
+  static const _sizes = [
+    8,
+    12,
+    16,
+    24,
+    32,
+    48,
+    64,
+    96,
+    128,
+    192,
+    256,
+    384,
+    512,
+    768,
+    1024,
+  ];
   static const _budgets = [1, 2, 5, 20, 100, 1000];
   static const _delays = [220, 150, 90, 50, 20, 0];
 
@@ -99,7 +116,9 @@ class _RaceScreenState extends State<RaceScreen> {
     if (_running || _selected.length < 2) return;
     _stop(updateState: false);
     final input = makeInput(_n, _shape, seed: ++_seed);
-    final algorithms = widget.catalog.algorithms.where((a) => _selected.contains(a.id)).toList();
+    final algorithms = widget.catalog.algorithms
+        .where((a) => _selected.contains(a.id))
+        .toList();
     _lanes
       ..clear()
       ..addAll(algorithms.map((a) => _RaceLane(a, input)));
@@ -113,7 +132,8 @@ class _RaceScreenState extends State<RaceScreen> {
   void _startLane(_RaceLane lane, List<int> input) {
     final worker = AlgorithmWorker(workerPath: widget.catalog.workerPath);
     lane.worker = worker;
-    final requestId = 'race-${lane.algorithm.id}-${DateTime.now().microsecondsSinceEpoch}';
+    final requestId =
+        'race-${lane.algorithm.id}-${DateTime.now().microsecondsSinceEpoch}';
     lane.subscription = worker.messages.listen((message) {
       final type = message['type'];
       final eventRequestId = message['requestId']?.toString();
@@ -199,12 +219,15 @@ class _RaceScreenState extends State<RaceScreen> {
     }
   }
 
-  int? _marker(MarkerData marker, String list) => marker.list == list ? marker.index : null;
+  int? _marker(MarkerData marker, String list) =>
+      marker.list == list ? marker.index : null;
 
   @override
   Widget build(BuildContext context) {
     if (widget.catalog.algorithms.length < 2) {
-      return const Center(child: Text('Race needs at least two valid algorithms.'));
+      return const Center(
+        child: Text('Race needs at least two valid algorithms.'),
+      );
     }
     return Padding(
       padding: const EdgeInsets.all(12),
@@ -217,7 +240,10 @@ class _RaceScreenState extends State<RaceScreen> {
                 children: [
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: Text('Choose 2–4 algorithms', style: Theme.of(context).textTheme.titleMedium),
+                    child: Text(
+                      'Choose 2–4 algorithms',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
                   ),
                   const SizedBox(height: 6),
                   SizedBox(
@@ -228,9 +254,13 @@ class _RaceScreenState extends State<RaceScreen> {
                         children: [
                           for (final algorithm in widget.catalog.algorithms)
                             FilterChip(
-                              label: Text('${algorithm.name} · ${algorithm.author}'),
+                              label: Text(
+                                '${algorithm.name} · ${algorithm.author}',
+                              ),
                               selected: _selected.contains(algorithm.id),
-                              onSelected: _running ? null : (value) => _toggle(algorithm, value),
+                              onSelected: _running
+                                  ? null
+                                  : (value) => _toggle(algorithm, value),
                             ),
                         ],
                       ),
@@ -242,18 +272,29 @@ class _RaceScreenState extends State<RaceScreen> {
                         child: DropdownButton<InputShape>(
                           isExpanded: true,
                           value: _shape,
-                          items: [for (final s in InputShape.values) DropdownMenuItem(value: s, child: Text(inputShapeLabel(s)))],
-                          onChanged: _running ? null : (value) => setState(() => _shape = value ?? _shape),
+                          items: [
+                            for (final s in InputShape.values)
+                              DropdownMenuItem(
+                                value: s,
+                                child: Text(inputShapeLabel(s)),
+                              ),
+                          ],
+                          onChanged: _running
+                              ? null
+                              : (value) =>
+                                    setState(() => _shape = value ?? _shape),
                         ),
                       ),
                       Expanded(
                         child: Slider(
-                          value: _n.toDouble(),
-                          min: 8,
-                          max: 96,
-                          divisions: 22,
+                          value: _sizes.indexOf(_n).toDouble(),
+                          min: 0,
+                          max: (_sizes.length - 1).toDouble(),
+                          divisions: _sizes.length - 1,
                           label: 'n=$_n',
-                          onChanged: _running ? null : (v) => setState(() => _n = v.round()),
+                          onChanged: _running
+                              ? null
+                              : (v) => setState(() => _n = _sizes[v.round()]),
                         ),
                       ),
                       Expanded(
@@ -267,7 +308,9 @@ class _RaceScreenState extends State<RaceScreen> {
                         ),
                       ),
                       FilledButton.icon(
-                        onPressed: _running ? () => _stop() : (_selected.length >= 2 ? _start : null),
+                        onPressed: _running
+                            ? () => _stop()
+                            : (_selected.length >= 2 ? _start : null),
                         icon: Icon(_running ? Icons.stop : Icons.flag),
                         label: Text(_running ? 'Stop' : 'Race'),
                       ),
@@ -280,7 +323,9 @@ class _RaceScreenState extends State<RaceScreen> {
           const SizedBox(height: 8),
           Expanded(
             child: _lanes.isEmpty
-                ? const Center(child: Text('Every lane receives exactly the same input.'))
+                ? const Center(
+                    child: Text('Every lane receives exactly the same input.'),
+                  )
                 : GridView.builder(
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: _lanes.length <= 2 ? 2 : 2,
@@ -296,8 +341,19 @@ class _RaceScreenState extends State<RaceScreen> {
                           padding: const EdgeInsets.all(8),
                           child: Column(
                             children: [
-                              Text('${lane.algorithm.name} · ${lane.algorithm.author}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                              if (lane.error != null) Text(lane.error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                              Text(
+                                '${lane.algorithm.name} · ${lane.algorithm.author}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              if (lane.error != null)
+                                Text(
+                                  lane.error!,
+                                  style: TextStyle(
+                                    color: Theme.of(context).colorScheme.error,
+                                  ),
+                                ),
                               const SizedBox(height: 4),
                               Expanded(
                                 child: ArrayView(
@@ -305,7 +361,9 @@ class _RaceScreenState extends State<RaceScreen> {
                                   label: 'List',
                                   readIndex: _marker(lane.read, 'list'),
                                   writeIndex: _marker(lane.write, 'list'),
-                                  baseColor: parseHexColor(lane.algorithm.color),
+                                  baseColor: parseHexColor(
+                                    lane.algorithm.color,
+                                  ),
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -315,10 +373,14 @@ class _RaceScreenState extends State<RaceScreen> {
                                   label: 'Scratch',
                                   readIndex: _marker(lane.read, 'scratch'),
                                   writeIndex: _marker(lane.write, 'scratch'),
-                                  baseColor: parseHexColor(lane.algorithm.color).withValues(alpha: 0.72),
+                                  baseColor: parseHexColor(
+                                    lane.algorithm.color,
+                                  ).withValues(alpha: 0.72),
                                 ),
                               ),
-                              Text('R ${lane.metrics.reads}  W ${lane.metrics.writes}  C ${lane.metrics.comparisons}'),
+                              Text(
+                                'R ${lane.metrics.reads}  W ${lane.metrics.writes}  C ${lane.metrics.comparisons}',
+                              ),
                             ],
                           ),
                         ),

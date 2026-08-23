@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -25,6 +24,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   AlgorithmWorker? _worker;
   StreamSubscription<Map<String, dynamic>>? _subscription;
   Timer? _watchdog;
+  List<int> _input = const [];
   List<int> _numbers = const [];
   List<int> _scratch = const [];
   MetricsData _metrics = const MetricsData();
@@ -43,13 +43,38 @@ class _ExploreScreenState extends State<ExploreScreen> {
   int _seed = 42;
   bool _catalogUpdatePending = false;
 
+  // Geometric-ish steps keep small teaching examples easy to select while
+  // still allowing genuinely large inputs for fast algorithms.
+  static const _sizes = [
+    8,
+    12,
+    16,
+    24,
+    32,
+    48,
+    64,
+    96,
+    128,
+    192,
+    256,
+    384,
+    512,
+    768,
+    1024,
+    1536,
+    2048,
+    3072,
+    4096,
+  ];
   static const _budgets = [1, 2, 5, 20, 100, 1000];
   static const _delays = [220, 150, 90, 50, 20, 0];
 
   @override
   void initState() {
     super.initState();
-    _algorithm = widget.catalog.algorithms.isEmpty ? null : widget.catalog.algorithms.first;
+    _algorithm = widget.catalog.algorithms.isEmpty
+        ? null
+        : widget.catalog.algorithms.first;
     _resetInput();
   }
 
@@ -83,19 +108,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return algorithms.first;
   }
 
+  void _restoreInputState() {
+    _numbers = List<int>.from(_input);
+    _scratch = List<int>.filled(_input.length, 0);
+    _metrics = const MetricsData();
+    _read = const MarkerData();
+    _write = const MarkerData();
+    _locals = const {};
+    _line = 0;
+    _error = null;
+  }
+
+  void _restoreInput() => setState(_restoreInputState);
+
   void _resetInput() {
     _seed++;
-    final values = makeInput(_n, _shape, seed: _seed);
-    setState(() {
-      _numbers = values;
-      _scratch = List<int>.filled(values.length, 0);
-      _metrics = const MetricsData();
-      _read = const MarkerData();
-      _write = const MarkerData();
-      _locals = const {};
-      _line = 0;
-      _error = null;
-    });
+    _input = makeInput(_n, _shape, seed: _seed);
+    _restoreInput();
   }
 
   Future<void> _start({bool paused = false}) async {
@@ -161,7 +190,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
     if (!_running || _worker == null || _watchdog != null) return;
     _watchdog = _worker!.watchdog(
       timeout: const Duration(seconds: 2),
-      onTimeout: () => _fail('No checkpoint reached. The algorithm was stopped.'),
+      onTimeout: () =>
+          _fail('No checkpoint reached. The algorithm was stopped.'),
     );
   }
 
@@ -179,11 +209,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     if (!_running || worker == null || id == null) return;
     _atCheckpoint = false;
     _armWatchdog();
-    worker.send({
-      'type': 'advance',
-      'requestId': id,
-      'budget': budget,
-    });
+    worker.send({'type': 'advance', 'requestId': id, 'budget': budget});
   }
 
   void _togglePause() {
@@ -267,12 +293,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
-  int? _markerIndex(MarkerData marker, String list) => marker.list == list ? marker.index : null;
+  int? _markerIndex(MarkerData marker, String list) =>
+      marker.list == list ? marker.index : null;
 
   @override
   Widget build(BuildContext context) {
     if (widget.catalog.algorithms.isEmpty && !_running) {
-      return const Center(child: Text('No valid algorithms have been prepared yet.'));
+      return const Center(
+        child: Text('No valid algorithms have been prepared yet.'),
+      );
     }
 
     final controls = _controls(context);
@@ -284,7 +313,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
             label: 'List to be sorted',
             readIndex: _markerIndex(_read, 'list'),
             writeIndex: _markerIndex(_write, 'list'),
-            baseColor: _algorithm == null ? null : parseHexColor(_algorithm!.color),
+            baseColor: _algorithm == null
+                ? null
+                : parseHexColor(_algorithm!.color),
           ),
         ),
         const SizedBox(height: 8),
@@ -321,7 +352,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     children: [
                       _localsPanel(context),
                       const SizedBox(height: 8),
-                      Expanded(child: SourceView(source: _algorithm!.source, line: _line)),
+                      Expanded(
+                        child: SourceView(
+                          source: _algorithm!.source,
+                          line: _line,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -344,13 +380,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Widget _stats(BuildContext context) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          Text('Reads: ${_short(_metrics.reads)}'),
-          Text('Writes: ${_short(_metrics.writes)}'),
-          Text('Comparisons: ${_short(_metrics.comparisons)}'),
-        ],
-      );
+    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    children: [
+      Text('Reads: ${_short(_metrics.reads)}'),
+      Text('Writes: ${_short(_metrics.writes)}'),
+      Text('Comparisons: ${_short(_metrics.comparisons)}'),
+    ],
+  );
 
   Widget _localsPanel(BuildContext context) {
     return Card(
@@ -365,7 +401,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
             Expanded(
               child: _locals.isEmpty
                   ? Text(
-                      _running ? 'Waiting for first checkpoint…' : 'Run the algorithm to track local variables automatically.',
+                      _running
+                          ? 'Waiting for first checkpoint…'
+                          : 'Run the algorithm to track local variables automatically.',
                       style: Theme.of(context).textTheme.bodySmall,
                     )
                   : SingleChildScrollView(
@@ -380,7 +418,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     ),
             ),
             if (_error != null)
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
           ],
         ),
       ),
@@ -394,7 +435,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
           algorithms: widget.catalog.algorithms,
           value: _algorithm,
           enabled: !_running,
-          onChanged: (value) => setState(() => _algorithm = value),
+          onChanged: (value) {
+            if (value == null) return;
+            // Selecting another implementation should show the untouched
+            // input immediately. Keep the exact same permutation so students
+            // can compare algorithms rather than accidentally comparing data.
+            setState(() {
+              _algorithm = value;
+              _restoreInputState();
+            });
+          },
         ),
         const SizedBox(height: 8),
         Row(
@@ -403,10 +453,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
               child: DropdownButtonFormField<InputShape>(
                 key: ValueKey(_shape),
                 initialValue: _shape,
-                decoration: const InputDecoration(labelText: 'Input', border: OutlineInputBorder(), isDense: true),
+                decoration: const InputDecoration(
+                  labelText: 'Input',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
                 items: [
                   for (final shape in InputShape.values)
-                    DropdownMenuItem(value: shape, child: Text(inputShapeLabel(shape))),
+                    DropdownMenuItem(
+                      value: shape,
+                      child: Text(inputShapeLabel(shape)),
+                    ),
                 ],
                 onChanged: _running
                     ? null
@@ -424,16 +481,20 @@ class _ExploreScreenState extends State<ExploreScreen> {
               icon: const Icon(Icons.shuffle),
             ),
             IconButton(
-              onPressed: (!_running || (_paused && _atCheckpoint)) ? _step : null,
+              onPressed: (!_running || (_paused && _atCheckpoint))
+                  ? _step
+                  : null,
               tooltip: 'Single step',
               icon: const Icon(Icons.skip_next),
             ),
             IconButton(
               onPressed: _togglePause,
               tooltip: !_running ? 'Run' : (_paused ? 'Continue' : 'Pause'),
-              icon: Icon(!_running
-                  ? Icons.play_arrow
-                  : (_paused ? Icons.play_arrow : Icons.pause)),
+              icon: Icon(
+                !_running
+                    ? Icons.play_arrow
+                    : (_paused ? Icons.play_arrow : Icons.pause),
+              ),
             ),
             IconButton(
               onPressed: _running ? _stop : null,
@@ -462,19 +523,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
             const SizedBox(width: 52, child: Text('Size')),
             Expanded(
               child: Slider(
-                value: _n.toDouble(),
-                min: 8,
-                max: 192,
-                divisions: 23,
+                value: _sizes.indexOf(_n).toDouble(),
+                min: 0,
+                max: (_sizes.length - 1).toDouble(),
+                divisions: _sizes.length - 1,
                 onChanged: _running
                     ? null
                     : (value) {
-                        _n = max(8, value.round());
+                        _n = _sizes[value.round()];
                         _resetInput();
                       },
               ),
             ),
-            SizedBox(width: 52, child: Text('n=$_n')),
+            SizedBox(width: 64, child: Text('n=$_n')),
           ],
         ),
       ],

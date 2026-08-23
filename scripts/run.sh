@@ -63,12 +63,30 @@ MSG
 fi
 
 cleanup() {
-  if [[ -n "${WATCH_PID:-}" ]]; then
-    kill "$WATCH_PID" 2>/dev/null || true
-    wait "$WATCH_PID" 2>/dev/null || true
-  fi
+  local pid
+  for pid in "${SERVER_PID:-}" "${WATCH_PID:-}"; do
+    if [[ -n "$pid" ]]; then
+      kill "$pid" 2>/dev/null || true
+    fi
+  done
+  for pid in "${SERVER_PID:-}" "${WATCH_PID:-}"; do
+    if [[ -n "$pid" ]]; then
+      wait "$pid" 2>/dev/null || true
+    fi
+  done
 }
-trap cleanup EXIT INT TERM
+
+on_signal() {
+  local status="$1"
+  # Do not run cleanup a second time through the EXIT trap.
+  trap - EXIT INT TERM
+  cleanup
+  exit "$status"
+}
+
+trap cleanup EXIT
+trap 'on_signal 130' INT
+trap 'on_signal 143' TERM
 
 echo "==> Resolving application dependencies"
 flutter pub get
@@ -91,4 +109,7 @@ if [[ "${NO_OPEN:-0}" == "1" ]]; then
 fi
 
 echo "==> Starting classroom server"
-dart run tool/classroom_server.dart --port "$PORT" "${OPEN_ARG[@]}"
+dart run tool/classroom_server.dart --port "$PORT" "${OPEN_ARG[@]}" &
+SERVER_PID=$!
+wait "$SERVER_PID"
+SERVER_PID=""

@@ -12,11 +12,11 @@ import '../worker_client.dart';
 enum Normalization { raw, n, nLogN, nSquared }
 
 String _normalizationLabel(Normalization value) => switch (value) {
-      Normalization.raw => 'operations',
-      Normalization.n => 'operations / n',
-      Normalization.nLogN => 'operations / (n log n)',
-      Normalization.nSquared => 'operations / n²',
-    };
+  Normalization.raw => 'operations',
+  Normalization.n => 'operations / n',
+  Normalization.nLogN => 'operations / (n log n)',
+  Normalization.nSquared => 'operations / n²',
+};
 
 class AnalyzeScreen extends StatefulWidget {
   const AnalyzeScreen({super.key, required this.catalog});
@@ -36,7 +36,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
   bool _catalogUpdatePending = false;
   AlgorithmCatalog? _resultsCatalog;
 
-  static const _sizes = [32, 64, 128, 256, 512];
+  static const _sizes = [32, 64, 128, 256, 512, 1024, 2048];
 
   @override
   void didUpdateWidget(covariant AnalyzeScreen oldWidget) {
@@ -76,14 +76,11 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
       final worker = AlgorithmWorker(workerPath: catalog.workerPath);
       _workers.add(worker);
       try {
-        final message = await worker.request(
-          {
-            'type': 'analyze',
-            'algorithmId': algorithm.id,
-            'cases': cases,
-          },
-          timeout: const Duration(seconds: 6),
-        );
+        final message = await worker.request({
+          'type': 'analyze',
+          'algorithmId': algorithm.id,
+          'cases': cases,
+        }, timeout: const Duration(seconds: 6));
         if (!mounted || generation != _generation) return;
         setState(() {
           _results[algorithm.id] = AnalysisData.fromJson(message);
@@ -161,7 +158,9 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
               child: ListTile(
                 leading: Icon(Icons.sync),
                 title: Text('New algorithm versions are ready'),
-                subtitle: Text('This analysis finishes on the previous build; run Analyze all again afterwards.'),
+                subtitle: Text(
+                  'This analysis finishes on the previous build; run Analyze all again afterwards.',
+                ),
               ),
             ),
           ],
@@ -172,7 +171,9 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
             child: _results.isEmpty
                 ? Center(
                     child: Text(
-                      _running ? 'Analyzing…' : 'Run the class-wide correctness, stability and complexity analysis.',
+                      _running
+                          ? 'Analyzing…'
+                          : 'Run the class-wide correctness, stability and complexity analysis.',
                     ),
                   )
                 : LayoutBuilder(
@@ -216,9 +217,18 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
               child: DropdownButtonFormField<InputShape>(
                 key: ValueKey(_shape),
                 initialValue: _shape,
-                decoration: const InputDecoration(labelText: 'Input shape', border: OutlineInputBorder(), isDense: true),
-                items: [for (final s in InputShape.values) DropdownMenuItem(value: s, child: Text(inputShapeLabel(s)))],
-                onChanged: _running ? null : (v) => setState(() => _shape = v ?? _shape),
+                decoration: const InputDecoration(
+                  labelText: 'Input shape',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: [
+                  for (final s in InputShape.values)
+                    DropdownMenuItem(value: s, child: Text(inputShapeLabel(s))),
+                ],
+                onChanged: _running
+                    ? null
+                    : (v) => setState(() => _shape = v ?? _shape),
               ),
             ),
             SizedBox(
@@ -226,9 +236,20 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
               child: DropdownButtonFormField<Normalization>(
                 key: ValueKey(_normalization),
                 initialValue: _normalization,
-                decoration: const InputDecoration(labelText: 'Graph', border: OutlineInputBorder(), isDense: true),
-                items: [for (final n in Normalization.values) DropdownMenuItem(value: n, child: Text(_normalizationLabel(n)))],
-                onChanged: (v) => setState(() => _normalization = v ?? _normalization),
+                decoration: const InputDecoration(
+                  labelText: 'Graph',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: [
+                  for (final n in Normalization.values)
+                    DropdownMenuItem(
+                      value: n,
+                      child: Text(_normalizationLabel(n)),
+                    ),
+                ],
+                onChanged: (v) =>
+                    setState(() => _normalization = v ?? _normalization),
               ),
             ),
             FilledButton.icon(
@@ -246,7 +267,9 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
   Widget _diagnostics(BuildContext context) {
     return ExpansionTile(
       tilePadding: const EdgeInsets.symmetric(horizontal: 12),
-      title: Text('${widget.catalog.diagnostics.length} skipped file(s) / build diagnostic(s)'),
+      title: Text(
+        '${widget.catalog.diagnostics.length} skipped file(s) / build diagnostic(s)',
+      ),
       children: [
         for (final diagnostic in widget.catalog.diagnostics)
           ListTile(
@@ -266,7 +289,9 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     }).toList();
 
     if (valid.isEmpty) {
-      return const Card(child: Center(child: Text('No correct benchmark result yet.')));
+      return const Card(
+        child: Center(child: Text('No correct benchmark result yet.')),
+      );
     }
 
     return Card(
@@ -275,7 +300,10 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(_normalizationLabel(_normalization), style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              _normalizationLabel(_normalization),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
             const SizedBox(height: 8),
             Expanded(
               child: LineChart(
@@ -285,14 +313,23 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                   gridData: const FlGridData(show: false),
                   borderData: FlBorderData(show: false),
                   titlesData: FlTitlesData(
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    leftTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 24,
-                        getTitlesWidget: (value, meta) => Text('${value.toInt()}', style: const TextStyle(fontSize: 10)),
+                        getTitlesWidget: (value, meta) => Text(
+                          '${value.toInt()}',
+                          style: const TextStyle(fontSize: 10),
+                        ),
                       ),
                     ),
                   ),
@@ -304,8 +341,12 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                         dotData: const FlDotData(show: true),
                         color: parseHexColor(algorithm.color),
                         spots: [
-                          for (final point in _results[algorithm.id]!.benchmarks)
-                            FlSpot(point.n.toDouble(), _normalized(point).toDouble()),
+                          for (final point
+                              in _results[algorithm.id]!.benchmarks)
+                            FlSpot(
+                              point.n.toDouble(),
+                              _normalized(point).toDouble(),
+                            ),
                         ],
                       ),
                   ],
@@ -320,9 +361,16 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.circle, size: 10, color: parseHexColor(algorithm.color)),
+                      Icon(
+                        Icons.circle,
+                        size: 10,
+                        color: parseHexColor(algorithm.color),
+                      ),
                       const SizedBox(width: 4),
-                      Text('${algorithm.name} · ${algorithm.author}', style: const TextStyle(fontSize: 11)),
+                      Text(
+                        '${algorithm.name} · ${algorithm.author}',
+                        style: const TextStyle(fontSize: 11),
+                      ),
                     ],
                   ),
               ],
@@ -349,7 +397,8 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
       child: ListView(
         padding: const EdgeInsets.all(8),
         children: [
-          for (final algorithm in (_resultsCatalog ?? widget.catalog).algorithms)
+          for (final algorithm
+              in (_resultsCatalog ?? widget.catalog).algorithms)
             _resultTile(context, algorithm),
         ],
       ),
@@ -361,26 +410,41 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     if (result == null) {
       return ListTile(
         dense: true,
-        leading: Icon(Icons.circle, size: 12, color: parseHexColor(algorithm.color)),
+        leading: Icon(
+          Icons.circle,
+          size: 12,
+          color: parseHexColor(algorithm.color),
+        ),
         title: Text('${algorithm.name} · ${algorithm.author}'),
-        trailing: _running ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)) : null,
+        trailing: _running
+            ? const SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : null,
       );
     }
 
-    final latest = result.benchmarks.isEmpty ? null : result.benchmarks.last.metrics;
+    final latest = result.benchmarks.isEmpty
+        ? null
+        : result.benchmarks.last.metrics;
     final status = result.timeout
         ? 'TIMEOUT'
         : result.error != null
-            ? 'ERROR'
-            : !result.correct
-                ? 'INCORRECT'
-                : result.stable == true
-                    ? 'correct · stable (tested)'
-                    : 'correct · unstable';
+        ? 'ERROR'
+        : !result.correct
+        ? 'INCORRECT'
+        : result.stable == true
+        ? 'correct · stable (tested)'
+        : 'correct · unstable';
 
     return ListTile(
       dense: true,
-      leading: Icon(Icons.circle, size: 12, color: parseHexColor(algorithm.color)),
+      leading: Icon(
+        Icons.circle,
+        size: 12,
+        color: parseHexColor(algorithm.color),
+      ),
       title: Text('${algorithm.name} · ${algorithm.author}'),
       subtitle: Text(
         latest == null
