@@ -1,6 +1,7 @@
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
 import 'package:analyzer/dart/analysis/utilities.dart';
+import 'package:analyzer/source/line_info.dart';
 
 class InstrumentationResult {
   InstrumentationResult({required this.source, required this.errors});
