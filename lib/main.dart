@@ -141,7 +141,7 @@ class _HomeState extends State<_Home> {
           child: ListView.separated(
             shrinkWrap: true,
             itemCount: widget.catalog.diagnostics.length,
-            separatorBuilder: (_, __) => const Divider(),
+            separatorBuilder: (_, _) => const Divider(),
             itemBuilder: (context, index) {
               final diagnostic = widget.catalog.diagnostics[index];
               return ListTile(

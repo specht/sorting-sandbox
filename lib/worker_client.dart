@@ -15,9 +15,9 @@ class AlgorithmWorker {
   AlgorithmWorker({required String workerPath})
       : _worker = web.Worker('runtime/$workerPath'.toJS) {
     _worker.onmessage = ((web.MessageEvent event) {
-      final raw = event.data;
-      if (raw is! JSString) return;
-      final message = jsonDecode(raw.toDart) as Map<String, dynamic>;
+      final raw = event.data.dartify();
+      if (raw is! String) return;
+      final message = jsonDecode(raw) as Map<String, dynamic>;
       _lastMessageAt = DateTime.now();
       _messages.add(message);
     }).toJS;

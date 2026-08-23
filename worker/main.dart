@@ -15,9 +15,9 @@ CheckpointSession? _visualSession;
 
 void main() {
   workerSelf.onmessage = ((web.MessageEvent event) {
-    final raw = event.data;
-    if (raw is! JSString) return;
-    final message = jsonDecode(raw.toDart) as Map<String, dynamic>;
+    final raw = event.data.dartify();
+    if (raw is! String) return;
+    final message = jsonDecode(raw) as Map<String, dynamic>;
     unawaited(_handle(message));
   }).toJS;
 }
