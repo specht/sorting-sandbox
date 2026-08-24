@@ -47,6 +47,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   bool _showMemoryAccess = false;
   final List<VisualFrame> _history = [];
   int _historyCursor = -1;
+  int _latestCheckpoint = -1;
+  int? _scrubTarget;
   bool _replaying = false;
   int? _replayTarget;
   bool _continueAfterReplay = false;
@@ -77,8 +79,52 @@ class _ExploreScreenState extends State<ExploreScreen> {
   // Twenty-one speed levels preserve the old six anchor speeds exactly,
   // with geometric interpolation for execution budget and linear
   // interpolation for frame delay between them.
-  static const _budgets = [1, 1, 1, 2, 2, 3, 3, 4, 5, 7, 10, 14, 20, 30, 45, 67, 100, 178, 316, 562, 1000];
-  static const _delays = [220, 202, 185, 168, 150, 135, 120, 105, 90, 80, 70, 60, 50, 42, 35, 28, 20, 15, 10, 5, 0];
+  static const _budgets = [
+    1,
+    1,
+    1,
+    2,
+    2,
+    3,
+    3,
+    4,
+    5,
+    7,
+    10,
+    14,
+    20,
+    30,
+    45,
+    67,
+    100,
+    178,
+    316,
+    562,
+    1000,
+  ];
+  static const _delays = [
+    220,
+    202,
+    185,
+    168,
+    150,
+    135,
+    120,
+    105,
+    90,
+    80,
+    70,
+    60,
+    50,
+    42,
+    35,
+    28,
+    20,
+    15,
+    10,
+    5,
+    0,
+  ];
 
   @override
   void initState() {
@@ -119,18 +165,22 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return algorithms.first;
   }
 
+  int get _currentCheckpoint {
+    if (_historyCursor < 0 || _historyCursor >= _history.length) return -1;
+    return _history[_historyCursor].checkpoint;
+  }
+
   bool get _viewingHistory =>
-      _historyCursor >= 0 && _historyCursor < _history.length - 1;
+      _currentCheckpoint >= 0 && _currentCheckpoint < _latestCheckpoint;
 
   bool get _canBrowseHistory =>
-      _history.length > 1 &&
-      (!_running || (_atCheckpoint && !_replaying));
+      _latestCheckpoint >= 0 && (!_running || (_atCheckpoint && !_replaying));
 
-  bool get _canStepBack => _canBrowseHistory && _historyCursor > 0;
+  bool get _canStepBack => _canBrowseHistory && _currentCheckpoint > 0;
 
   bool get _canStepForward {
-    if (_history.isEmpty) return !_running;
-    if (_historyCursor < _history.length - 1) return _canBrowseHistory;
+    if (_currentCheckpoint < 0) return !_running;
+    if (_currentCheckpoint < _latestCheckpoint) return _canBrowseHistory;
     return _running && _paused && _atCheckpoint && !_replaying;
   }
 
@@ -145,6 +195,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void _clearHistoryState() {
     _history.clear();
     _historyCursor = -1;
+    _latestCheckpoint = -1;
+    _scrubTarget = null;
     _replaying = false;
     _replayTarget = null;
     _continueAfterReplay = false;
@@ -161,15 +213,34 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   void _recordFrameState(VisualFrame frame) {
-    if (_history.isNotEmpty &&
-        _history.last.checkpoint == frame.checkpoint) {
-      _history[_history.length - 1] = frame;
-    } else {
-      _history.add(frame);
+    if (frame.checkpoint > _latestCheckpoint) {
+      _latestCheckpoint = frame.checkpoint;
     }
-    final overflow = _history.length - _historyLimit;
-    if (overflow > 0) _history.removeRange(0, overflow);
-    _historyCursor = _history.length - 1;
+
+    var index = _history.indexWhere(
+      (candidate) => candidate.checkpoint >= frame.checkpoint,
+    );
+    if (index >= 0 && _history[index].checkpoint == frame.checkpoint) {
+      _history[index] = frame;
+    } else {
+      if (index < 0) index = _history.length;
+      _history.insert(index, frame);
+    }
+    _historyCursor = index;
+
+    // Keep a bounded cache around the checkpoint the user is looking at.
+    // The furthest checkpoint is tracked separately, so cached future frames
+    // may be discarded without shortening the timeline.
+    while (_history.length > _historyLimit) {
+      final left = _historyCursor;
+      final right = _history.length - 1 - _historyCursor;
+      if (left > right) {
+        _history.removeAt(0);
+        _historyCursor--;
+      } else {
+        _history.removeLast();
+      }
+    }
   }
 
   void _restoreInputState() {
@@ -348,21 +419,41 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   void _stepBack() {
     if (!_canStepBack) return;
-    _showHistoryAt(_historyCursor - 1);
+    _showCheckpoint(_currentCheckpoint - 1);
   }
 
   void _stepForward() {
-    if (_history.isEmpty) {
+    if (_currentCheckpoint < 0) {
       if (!_running) _start(paused: true);
       return;
     }
-    if (_historyCursor < _history.length - 1) {
-      if (_canBrowseHistory) _showHistoryAt(_historyCursor + 1);
+    if (_currentCheckpoint < _latestCheckpoint) {
+      _showCheckpoint(_currentCheckpoint + 1);
       return;
     }
     if (_running && _paused && _atCheckpoint && !_replaying) {
       _sendAdvance(1);
     }
+  }
+
+  void _showCheckpoint(int checkpoint) {
+    if (!_canBrowseHistory ||
+        checkpoint < 0 ||
+        checkpoint > _latestCheckpoint) {
+      return;
+    }
+    _scrubTarget = null;
+    final cached = _history.indexWhere(
+      (frame) => frame.checkpoint == checkpoint,
+    );
+    if (cached >= 0) {
+      _showHistoryAt(cached);
+      return;
+    }
+
+    // Fast-forward a fresh disposable worker to the exact checkpoint. This
+    // keeps high-speed animation sparse while making debug stepping exact.
+    unawaited(_start(paused: true, replayCheckpoint: checkpoint));
   }
 
   void _showHistoryAt(int index) {
@@ -388,6 +479,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
         _history.removeRange(_historyCursor + 1, _history.length);
       }
       _historyCursor = _history.length - 1;
+      _latestCheckpoint = target;
+      _scrubTarget = null;
     });
 
     await _start(
@@ -671,11 +764,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Widget _historyScrubber(BuildContext context) {
-    if (_history.length < 2 || _historyCursor < 0) {
-      return const SizedBox.shrink();
-    }
-    final cursor = _historyCursor.clamp(0, _history.length - 1).toInt();
-    final frame = _history[cursor];
+    final hasCheckpoint = _currentCheckpoint >= 0 && _latestCheckpoint >= 0;
+    final current = hasCheckpoint ? _currentCheckpoint : 0;
+    final maximum = _latestCheckpoint > 0 ? _latestCheckpoint : 1;
+    final target = (_scrubTarget ?? current).clamp(0, maximum).toInt();
+    final canScrub = _canBrowseHistory && _latestCheckpoint > 0;
+
     return SizedBox(
       height: 30,
       child: Row(
@@ -684,10 +778,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             message: _viewingHistory
                 ? 'Viewing an earlier checkpoint. Run resumes from here.'
                 : 'Execution history',
-            child: Icon(
-              _replaying ? Icons.sync : Icons.history,
-              size: 18,
-            ),
+            child: Icon(_replaying ? Icons.sync : Icons.history, size: 18),
           ),
           const SizedBox(width: 4),
           Expanded(
@@ -698,21 +789,30 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
               ),
               child: Slider(
-                value: cursor.toDouble(),
+                value: target.toDouble(),
                 min: 0,
-                max: (_history.length - 1).toDouble(),
-                divisions: _history.length - 1,
-                label: 'step ${frame.checkpoint}',
-                onChanged: _canBrowseHistory
-                    ? (value) => _showHistoryAt(value.round())
+                max: maximum.toDouble(),
+                divisions: _latestCheckpoint > 0 && _latestCheckpoint <= 5000
+                    ? _latestCheckpoint
+                    : null,
+                label: hasCheckpoint ? 'step $target' : 'start',
+                onChanged: canScrub
+                    ? (value) => setState(() => _scrubTarget = value.round())
+                    : null,
+                onChangeEnd: canScrub
+                    ? (value) {
+                        final checkpoint = value.round();
+                        setState(() => _scrubTarget = null);
+                        _showCheckpoint(checkpoint);
+                      }
                     : null,
               ),
             ),
           ),
           SizedBox(
-            width: 72,
+            width: 112,
             child: Text(
-              'step ${frame.checkpoint}',
+              hasCheckpoint ? 'step $target / $_latestCheckpoint' : 'start',
               textAlign: TextAlign.end,
               style: Theme.of(context).textTheme.labelSmall,
             ),
@@ -796,7 +896,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ),
           ],
         ),
-        if (_history.length > 1) _historyScrubber(context),
+        _historyScrubber(context),
         Row(
           children: [
             const SizedBox(width: 52, child: Text('Speed')),

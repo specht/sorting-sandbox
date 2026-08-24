@@ -38,6 +38,7 @@ class _RaceScreenState extends State<RaceScreen> {
   final Set<String> _selected = {};
   final List<_RaceLane> _lanes = [];
   bool _running = false;
+  bool _controlsCollapsed = false;
   int _n = 48;
   int _speed = 12;
   InputShape _shape = InputShape.random;
@@ -61,8 +62,52 @@ class _RaceScreenState extends State<RaceScreen> {
     768,
     1024,
   ];
-  static const _budgets = [1, 1, 1, 2, 2, 3, 3, 4, 5, 7, 10, 14, 20, 30, 45, 67, 100, 178, 316, 562, 1000];
-  static const _delays = [220, 202, 185, 168, 150, 135, 120, 105, 90, 80, 70, 60, 50, 42, 35, 28, 20, 15, 10, 5, 0];
+  static const _budgets = [
+    1,
+    1,
+    1,
+    2,
+    2,
+    3,
+    3,
+    4,
+    5,
+    7,
+    10,
+    14,
+    20,
+    30,
+    45,
+    67,
+    100,
+    178,
+    316,
+    562,
+    1000,
+  ];
+  static const _delays = [
+    220,
+    202,
+    185,
+    168,
+    150,
+    135,
+    120,
+    105,
+    90,
+    80,
+    70,
+    60,
+    50,
+    42,
+    35,
+    28,
+    20,
+    15,
+    10,
+    5,
+    0,
+  ];
 
   @override
   void initState() {
@@ -122,7 +167,10 @@ class _RaceScreenState extends State<RaceScreen> {
     _lanes
       ..clear()
       ..addAll(algorithms.map((a) => _RaceLane(a, input)));
-    setState(() => _running = true);
+    setState(() {
+      _running = true;
+      _controlsCollapsed = true;
+    });
 
     for (final lane in _lanes) {
       _startLane(lane, input);
@@ -259,9 +307,11 @@ class _RaceScreenState extends State<RaceScreen> {
         ),
         const SizedBox(width: 6),
         IconButton.filled(
-          onPressed: () => _stop(),
-          tooltip: 'Stop race',
-          icon: const Icon(Icons.stop),
+          onPressed: _running
+              ? () => _stop()
+              : () => setState(() => _controlsCollapsed = false),
+          tooltip: _running ? 'Stop race' : 'Race setup',
+          icon: Icon(_running ? Icons.stop : Icons.tune),
         ),
       ],
     );
@@ -285,97 +335,105 @@ class _RaceScreenState extends State<RaceScreen> {
               alignment: Alignment.topCenter,
               child: Padding(
                 padding: const EdgeInsets.all(10),
-                child: _running
+                child: _controlsCollapsed
                     ? _compactRaceControls(context)
                     : Column(
                         children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Choose 2–4 algorithms',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 124),
-                    child: SingleChildScrollView(
-                      child: Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          for (final algorithm in widget.catalog.algorithms)
-                            FilterChip(
-                              label: Text(
-                                '${algorithm.name} · ${algorithm.author}',
-                              ),
-                              selected: _selected.contains(algorithm.id),
-                              onSelected: _running
-                                  ? null
-                                  : (value) => _toggle(algorithm, value),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Choose 2–4 algorithms',
+                              style: Theme.of(context).textTheme.titleMedium,
                             ),
+                          ),
+                          const SizedBox(height: 6),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxHeight: 124),
+                            child: SingleChildScrollView(
+                              child: Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: [
+                                  for (final algorithm
+                                      in widget.catalog.algorithms)
+                                    FilterChip(
+                                      label: Text(
+                                        '${algorithm.name} · ${algorithm.author}',
+                                      ),
+                                      selected: _selected.contains(
+                                        algorithm.id,
+                                      ),
+                                      onSelected: _running
+                                          ? null
+                                          : (value) =>
+                                                _toggle(algorithm, value),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          AppDropdown<InputShape>(
+                            label: 'Input',
+                            value: _shape,
+                            enabled: !_running,
+                            items: [
+                              for (final s in InputShape.values)
+                                DropdownMenuItem(
+                                  value: s,
+                                  child: Text(inputShapeLabel(s)),
+                                ),
+                            ],
+                            onChanged: (value) =>
+                                setState(() => _shape = value ?? _shape),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [const Text('Size'), Text('n=$_n')],
+                          ),
+                          Slider(
+                            value: _sizes.indexOf(_n).toDouble(),
+                            min: 0,
+                            max: (_sizes.length - 1).toDouble(),
+                            divisions: _sizes.length - 1,
+                            label: 'n=$_n',
+                            onChanged: _running
+                                ? null
+                                : (v) => setState(() => _n = _sizes[v.round()]),
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Speed'),
+                              Text('${_speed * 5}%'),
+                            ],
+                          ),
+                          Slider(
+                            value: _speed.toDouble(),
+                            min: 0,
+                            max: 20,
+                            divisions: 20,
+                            label: '${_speed * 5}%',
+                            onChanged: (v) =>
+                                setState(() => _speed = v.round()),
+                          ),
+                          const SizedBox(height: 4),
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size.fromHeight(48),
+                              ),
+                              onPressed: _selected.length >= 2 ? _start : null,
+                              icon: const Icon(Icons.sports_score),
+                              label: const Text('Race'),
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  AppDropdown<InputShape>(
-                    label: 'Input',
-                    value: _shape,
-                    enabled: !_running,
-                    items: [
-                      for (final s in InputShape.values)
-                        DropdownMenuItem(
-                          value: s,
-                          child: Text(inputShapeLabel(s)),
-                        ),
-                    ],
-                    onChanged: (value) =>
-                        setState(() => _shape = value ?? _shape),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [const Text('Size'), Text('n=$_n')],
-                  ),
-                  Slider(
-                    value: _sizes.indexOf(_n).toDouble(),
-                    min: 0,
-                    max: (_sizes.length - 1).toDouble(),
-                    divisions: _sizes.length - 1,
-                    label: 'n=$_n',
-                    onChanged: _running
-                        ? null
-                        : (v) => setState(() => _n = _sizes[v.round()]),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [const Text('Speed'), Text('${_speed * 5}%')],
-                  ),
-                  Slider(
-                    value: _speed.toDouble(),
-                    min: 0,
-                    max: 20,
-                    divisions: 20,
-                    label: '${_speed * 5}%',
-                    onChanged: (v) => setState(() => _speed = v.round()),
-                  ),
-                  const SizedBox(height: 4),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
-                      ),
-                      onPressed: _selected.length >= 2 ? _start : null,
-                      icon: const Icon(Icons.sports_score),
-                      label: const Text('Race'),
-                    ),
-                  ),
-                ],
               ),
             ),
-          ),
           ),
           const SizedBox(height: 8),
           Expanded(
