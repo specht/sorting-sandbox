@@ -32,8 +32,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
   List<int> _numbers = const [];
   List<int> _scratch = const [];
   MetricsData _metrics = const MetricsData();
-  MarkerData _read = const MarkerData();
-  MarkerData _write = const MarkerData();
+  List<MarkerData> _reads = const [];
+  List<MarkerData> _writes = const [];
   Map<String, dynamic> _locals = const {};
   int _line = 0;
   int _n = 48;
@@ -217,8 +217,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _numbers = frame.numbers;
     _scratch = frame.scratch;
     _metrics = frame.metrics;
-    _read = frame.read;
-    _write = frame.write;
+    _reads = frame.reads;
+    _writes = frame.writes;
     _locals = frame.locals;
     _line = frame.line;
   }
@@ -268,8 +268,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _numbers = List<int>.from(_input);
     _scratch = List<int>.filled(_input.length, 0);
     _metrics = const MetricsData();
-    _read = const MarkerData();
-    _write = const MarkerData();
+    _reads = const [];
+    _writes = const [];
     _locals = const {};
     _line = 0;
     _error = null;
@@ -593,8 +593,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _paused = false;
       _requestId = null;
       _atCheckpoint = false;
-      _read = const MarkerData();
-      _write = const MarkerData();
+      _reads = const [];
+      _writes = const [];
       _replaying = false;
       _replayTarget = null;
       _continueAfterReplay = false;
@@ -619,8 +619,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _requestId = null;
       _atCheckpoint = false;
       _error = message;
-      _read = const MarkerData();
-      _write = const MarkerData();
+      _reads = const [];
+      _writes = const [];
       _replaying = false;
       _replayTarget = null;
       _continueAfterReplay = false;
@@ -654,8 +654,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
       setState(() {
         _running = false;
         _paused = false;
-        _read = const MarkerData();
-        _write = const MarkerData();
+        _reads = const [];
+        _writes = const [];
         if (_catalogUpdatePending) {
           _algorithm = _mappedAlgorithm();
           _catalogUpdatePending = false;
@@ -664,15 +664,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
-  int? _markerIndex(MarkerData marker, String list) =>
-      marker.list == list ? marker.index : null;
+  Set<int> _markerIndices(List<MarkerData> markers, String list) => {
+    for (final marker in markers)
+      if (marker.list == list && marker.index != null) marker.index!,
+  };
 
   Map<String, int> _indexVariables() {
     if (!_running && !_viewingHistory) return const {};
     final result = <String, int>{};
     for (final entry in _locals.entries) {
       final value = entry.value;
-      if (value is int && value >= 0 && value < _numbers.length) {
+      if (value is int && value >= 0 && value <= _numbers.length) {
         result[entry.key] = value;
       }
     }
@@ -694,8 +696,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
           child: ArrayView(
             values: _numbers,
             label: 'List to be sorted',
-            readIndex: _showMemoryAccess ? _markerIndex(_read, 'list') : null,
-            writeIndex: _showMemoryAccess ? _markerIndex(_write, 'list') : null,
+            readIndices: _showMemoryAccess
+                ? _markerIndices(_reads, 'list')
+                : const {},
+            writeIndices: _showMemoryAccess
+                ? _markerIndices(_writes, 'list')
+                : const {},
             baseColor: _algorithm == null
                 ? null
                 : parseHexColor(_algorithm!.color),
@@ -709,12 +715,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
           child: ArrayView(
             values: _scratch,
             label: 'Temporary list',
-            readIndex: _showMemoryAccess
-                ? _markerIndex(_read, 'scratch')
-                : null,
-            writeIndex: _showMemoryAccess
-                ? _markerIndex(_write, 'scratch')
-                : null,
+            readIndices: _showMemoryAccess
+                ? _markerIndices(_reads, 'scratch')
+                : const {},
+            writeIndices: _showMemoryAccess
+                ? _markerIndices(_writes, 'scratch')
+                : const {},
             baseColor: Colors.grey,
           ),
         ),
@@ -795,8 +801,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
             onSelected: (value) => setState(() => _showMemoryAccess = value),
           ),
           if (_showMemoryAccess) ...[
-            _legendDot(Colors.orange, 'read'),
-            _legendDot(Theme.of(context).colorScheme.error, 'write'),
+            _legendDot(Colors.orangeAccent, 'read'),
+            _legendDot(const Color(0xFFFFA8B5), 'write'),
           ],
         ],
       ),

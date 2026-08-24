@@ -23,24 +23,24 @@ class SortingSandboxApp extends StatelessWidget {
           seedColor: focusColor,
           brightness: Brightness.dark,
         ).copyWith(
-          surface: const Color(0xFF101114),
-          surfaceContainerLowest: const Color(0xFF0B0C0F),
-          surfaceContainerLow: const Color(0xFF15171B),
-          surfaceContainer: const Color(0xFF191B20),
-          surfaceContainerHigh: const Color(0xFF202329),
-          surfaceContainerHighest: const Color(0xFF292C33),
+          surface: const Color(0xFF171A20),
+          surfaceContainerLowest: const Color(0xFF12151A),
+          surfaceContainerLow: const Color(0xFF1C2027),
+          surfaceContainer: const Color(0xFF21262E),
+          surfaceContainerHigh: const Color(0xFF292F38),
+          surfaceContainerHighest: const Color(0xFF323945),
           onSurface: const Color(0xFFE9EAF0),
           onSurfaceVariant: const Color(0xFFB8BBC4),
           outline: const Color(0xFF7C808A),
           outlineVariant: const Color(0xFF3B3E46),
         );
+    final baseTheme = ThemeData(useMaterial3: true, colorScheme: colorScheme);
     return MaterialApp(
       title: 'Sorting Sandbox',
       debugShowCheckedModeBanner: false,
       themeMode: ThemeMode.dark,
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorScheme: colorScheme,
+      darkTheme: baseTheme.copyWith(
+        textTheme: baseTheme.textTheme.apply(fontSizeFactor: 1.08),
         scaffoldBackgroundColor: colorScheme.surface,
         appBarTheme: AppBarTheme(
           backgroundColor: colorScheme.surface,

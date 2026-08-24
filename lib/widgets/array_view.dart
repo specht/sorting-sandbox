@@ -9,6 +9,8 @@ class ArrayView extends StatelessWidget {
     required this.label,
     this.readIndex,
     this.writeIndex,
+    this.readIndices = const {},
+    this.writeIndices = const {},
     this.emptyHint,
     this.baseColor,
     this.reservePointerGutter = true,
@@ -19,6 +21,8 @@ class ArrayView extends StatelessWidget {
   final String label;
   final int? readIndex;
   final int? writeIndex;
+  final Set<int> readIndices;
+  final Set<int> writeIndices;
   final String? emptyHint;
   final Color? baseColor;
   final bool reservePointerGutter;
@@ -26,6 +30,11 @@ class ArrayView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final activeReads = <int>{...readIndices};
+    final activeWrites = <int>{...writeIndices};
+    if (readIndex != null) activeReads.add(readIndex!);
+    if (writeIndex != null) activeWrites.add(writeIndex!);
+
     final variableCounts = <int, int>{};
     for (final index in indexVariables.values) {
       if (index < 0 || index >= values.length) continue;
@@ -54,8 +63,8 @@ class ArrayView extends StatelessWidget {
                       : CustomPaint(
                           painter: _ArrayPainter(
                             values: values,
-                            readIndex: readIndex,
-                            writeIndex: writeIndex,
+                            readIndices: activeReads,
+                            writeIndices: activeWrites,
                             scheme: Theme.of(context).colorScheme,
                             baseColor: baseColor,
                             variableCounts: variableCounts,
@@ -93,16 +102,16 @@ class ArrayView extends StatelessWidget {
 class _ArrayPainter extends CustomPainter {
   _ArrayPainter({
     required this.values,
-    required this.readIndex,
-    required this.writeIndex,
+    required this.readIndices,
+    required this.writeIndices,
     required this.scheme,
     required this.baseColor,
     required this.variableCounts,
   });
 
   final List<int> values;
-  final int? readIndex;
-  final int? writeIndex;
+  final Set<int> readIndices;
+  final Set<int> writeIndices;
   final ColorScheme scheme;
   final Color? baseColor;
   final Map<int, int> variableCounts;
@@ -131,46 +140,73 @@ class _ArrayPainter extends CustomPainter {
       final variableCount = variableCounts[i] ?? 0;
       final lightColor = Color.lerp(arrayColor, Colors.white, 0.26)!;
       final darkColor = Color.lerp(arrayColor, Colors.black, 0.16)!;
-      final middleFocus = variableCount == 1
-          ? 0.10
-          : variableCount > 1
-          ? 0.28
-          : 0.0;
-      final topFocus = variableCount == 1
-          ? 0.45
-          : variableCount > 1
-          ? 0.85
-          : 0.0;
-      final middleColor = Color.lerp(arrayColor, scheme.primary, middleFocus)!;
-      final topColor = Color.lerp(lightColor, scheme.primary, topFocus)!;
-      final paint = i == writeIndex
-          ? (Paint()..color = scheme.error)
-          : i == readIndex
-          ? (Paint()..color = Colors.orange)
-          : (Paint()
-              ..shader = LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [darkColor, middleColor, topColor],
-                stops: const [0, 0.58, 1],
-              ).createShader(rect));
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, const Radius.circular(2)),
-        paint,
-      );
+      final paint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [darkColor, arrayColor, lightColor],
+          stops: const [0, 0.58, 1],
+        ).createShader(rect);
+      final rounded = RRect.fromRectAndRadius(rect, const Radius.circular(2));
+      canvas.drawRRect(rounded, paint);
 
-      // Index variables steer the student's own gradient toward the neutral
-      // focus color instead of covering the bar. One variable gives a clear
-      // cool highlight; two or more push the gradient much further.
-      // Read/write colors still take precedence.
+      // Variables live at the foot of a bar, exactly where their pointer is
+      // anchored. A second variable makes the band both brighter and taller.
+      if (variableCount > 0) {
+        final bandHeight = min(
+          rect.height,
+          variableCount == 1 ? 3.5 : 6.0,
+        );
+        final band = Rect.fromLTWH(
+          rect.left,
+          rect.bottom - bandHeight,
+          rect.width,
+          bandHeight,
+        );
+        canvas.drawRRect(
+          RRect.fromRectAndCorners(
+            band,
+            bottomLeft: const Radius.circular(2),
+            bottomRight: const Radius.circular(2),
+          ),
+          Paint()
+            ..color = scheme.primary.withValues(
+              alpha: variableCount == 1 ? 0.68 : 0.96,
+            ),
+        );
+      }
+
+      // Memory activity should annotate the student's bar, not replace it.
+      // Reads get a warm cap; writes get a pink outline. Multiple writes in a
+      // single source step therefore remain visible at the same time.
+      if (readIndices.contains(i)) {
+        final capHeight = min(rect.height, 3.5);
+        canvas.drawRRect(
+          RRect.fromRectAndCorners(
+            Rect.fromLTWH(rect.left, rect.top, rect.width, capHeight),
+            topLeft: const Radius.circular(2),
+            topRight: const Radius.circular(2),
+          ),
+          Paint()..color = Colors.orangeAccent,
+        );
+      }
+      if (writeIndices.contains(i)) {
+        canvas.drawRRect(
+          rounded.inflate(0.8),
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.6
+            ..color = const Color(0xFFFFA8B5),
+        );
+      }
     }
   }
 
   @override
   bool shouldRepaint(covariant _ArrayPainter oldDelegate) =>
       oldDelegate.values != values ||
-      oldDelegate.readIndex != readIndex ||
-      oldDelegate.writeIndex != writeIndex ||
+      oldDelegate.readIndices != readIndices ||
+      oldDelegate.writeIndices != writeIndices ||
       oldDelegate.scheme != scheme ||
       oldDelegate.baseColor != baseColor ||
       oldDelegate.variableCounts != variableCounts;
@@ -193,7 +229,7 @@ class _VariablePointerPainter extends CustomPainter {
 
     final byIndex = <int, List<String>>{};
     for (final entry in variables.entries) {
-      if (entry.value < 0 || entry.value >= length) continue;
+      if (entry.value < 0 || entry.value > length) continue;
       byIndex.putIfAbsent(entry.value, () => []).add(entry.key);
     }
 
@@ -209,9 +245,10 @@ class _VariablePointerPainter extends CustomPainter {
     final labels = <_PointerLabel>[];
     for (final entry in byIndex.entries) {
       final names = List<String>.from(entry.value)..sort();
+      final onePastEnd = entry.key == length;
       final textPainter = TextPainter(
         text: TextSpan(
-          text: names.join(', '),
+          text: onePastEnd ? '${names.join(', ')}  +1' : names.join(', '),
           style: TextStyle(
             color: color,
             fontSize: 10,
@@ -222,7 +259,10 @@ class _VariablePointerPainter extends CustomPainter {
         maxLines: 1,
       )..layout(maxWidth: size.width);
       labels.add(
-        _PointerLabel(x: (entry.key + 0.5) * slot, textPainter: textPainter),
+        _PointerLabel(
+          x: onePastEnd ? size.width - 4 : (entry.key + 0.5) * slot,
+          textPainter: textPainter,
+        ),
       );
     }
     labels.sort((a, b) => a.x.compareTo(b.x));

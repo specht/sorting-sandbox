@@ -339,20 +339,22 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                     leftTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 48,
+                        maxIncluded: false,
+                        reservedSize: 52,
                         getTitlesWidget: (value, meta) => Text(
                           _yAxisLabel(value),
-                          style: const TextStyle(fontSize: 9),
+                          style: const TextStyle(fontSize: 10.5),
                         ),
                       ),
                     ),
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 24,
+                        maxIncluded: false,
+                        reservedSize: 28,
                         getTitlesWidget: (value, meta) => Text(
                           _xAxisLabel(value),
-                          style: const TextStyle(fontSize: 10),
+                          style: const TextStyle(fontSize: 11),
                         ),
                       ),
                     ),
@@ -533,13 +535,28 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                       color: parseHexColor(algorithm.color),
                     ),
                   )
-                : CircleAvatar(
-                    radius: 15,
-                    backgroundColor: parseHexColor(
-                      algorithm.color,
-                    ).withValues(alpha: 0.16),
-                    foregroundColor: parseHexColor(algorithm.color),
-                    child: Text('$rank'),
+                : Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: parseHexColor(
+                        algorithm.color,
+                      ).withValues(alpha: 0.22),
+                      border: Border.all(
+                        color: parseHexColor(
+                          algorithm.color,
+                        ).withValues(alpha: 0.52),
+                      ),
+                    ),
+                    child: Text(
+                      '$rank',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
           ),
           const SizedBox(width: 4),
@@ -563,9 +580,9 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                     spacing: 12,
                     runSpacing: 2,
                     children: [
-                      Text('Reads ${_short(latest.reads)}'),
-                      Text('Writes ${_short(latest.writes)}'),
-                      Text('Comparisons ${_short(latest.comparisons)}'),
+                      Text('${_short(latest.reads)} reads'),
+                      Text('${_short(latest.writes)} writes'),
+                      Text('${_short(latest.comparisons)} comparisons'),
                     ],
                   ),
                 ] else if (result.failingCase != null) ...[
@@ -582,11 +599,17 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
               children: [
                 Text(
                   _short(aggregate),
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 Text(
                   'aggregate score',
-                  style: Theme.of(context).textTheme.labelSmall,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),

@@ -60,6 +60,8 @@ class ProbeState implements OperationProbe {
   int? readIndex;
   String? writeList;
   int? writeIndex;
+  final Map<String, Set<int>> _reads = {};
+  final Map<String, Set<int>> _writes = {};
 
   @override
   void onComparison() {
@@ -77,6 +79,7 @@ class ProbeState implements OperationProbe {
     metrics.reads++;
     readList = label;
     readIndex = index;
+    (_reads[label] ??= <int>{}).add(index);
     onOperation();
   }
 
@@ -86,7 +89,35 @@ class ProbeState implements OperationProbe {
     arrays[label]![index] = value;
     writeList = label;
     writeIndex = index;
+    (_writes[label] ??= <int>{}).add(index);
     onOperation();
+  }
+
+  List<Map<String, Object>> takeReads() {
+    final result = _takeMarkers(_reads);
+    readList = null;
+    readIndex = null;
+    return result;
+  }
+
+  List<Map<String, Object>> takeWrites() {
+    final result = _takeMarkers(_writes);
+    writeList = null;
+    writeIndex = null;
+    return result;
+  }
+
+  List<Map<String, Object>> _takeMarkers(Map<String, Set<int>> source) {
+    final result = <Map<String, Object>>[];
+    final labels = source.keys.toList()..sort();
+    for (final label in labels) {
+      final indices = source[label]!.toList()..sort();
+      for (final index in indices) {
+        result.add({'list': label, 'index': index});
+      }
+    }
+    source.clear();
+    return result;
   }
 
   List<int> keys(String label) => arrays[label]!.map((e) => e.key).toList();
@@ -150,6 +181,8 @@ class CheckpointSession {
   void _emit({required bool done}) {
     final list = probe.arrays['list'] ?? const <ElementState>[];
     final scratch = probe.arrays['scratch'] ?? const <ElementState>[];
+    final reads = probe.takeReads();
+    final writes = probe.takeWrites();
     emitFrame({
       'type': 'frame',
       'done': done,
@@ -160,12 +193,11 @@ class CheckpointSession {
       'scratch': scratch.map((e) => e.key).toList(),
       'origins': list.map((e) => e.origin).toList(),
       'metrics': probe.metrics.toJson(),
-      'read': probe.readList == null
-          ? null
-          : {'list': probe.readList, 'index': probe.readIndex},
-      'write': probe.writeList == null
-          ? null
-          : {'list': probe.writeList, 'index': probe.writeIndex},
+      'reads': reads,
+      'writes': writes,
+      // Keep singular markers for older app builds during a live worker swap.
+      'read': reads.isEmpty ? null : reads.last,
+      'write': writes.isEmpty ? null : writes.last,
     });
   }
 }

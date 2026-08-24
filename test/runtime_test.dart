@@ -48,6 +48,41 @@ void main() {
     expect(unstable.stable, isFalse);
   });
 
+
+  test('visual frames preserve every read and write in one source step', () async {
+    final frames = <Map<String, Object?>>[];
+    final session = CheckpointSession(emitFrame: frames.add);
+    final list = Elements.runtime(
+      probe: session.probe,
+      label: 'list',
+      values: [2, 1],
+    );
+
+    final first = session.checkpoint(20, const {});
+    await Future<void>.delayed(Duration.zero);
+    session.addBudget(1);
+    await first;
+
+    list.swap(0, 1);
+    final second = session.checkpoint(21, const {});
+    await Future<void>.delayed(Duration.zero);
+
+    final reads = (frames.last['reads'] as List)
+        .cast<Map>()
+        .map((marker) => marker['index'])
+        .toSet();
+    final writes = (frames.last['writes'] as List)
+        .cast<Map>()
+        .map((marker) => marker['index'])
+        .toSet();
+    expect(reads, {0, 1});
+    expect(writes, {0, 1});
+
+    session.addBudget(1);
+    await second;
+    session.finish();
+  });
+
   test('visual checkpoints carry deterministic sequence numbers', () async {
     final frames = <Map<String, Object?>>[];
     final session = CheckpointSession(emitFrame: frames.add);

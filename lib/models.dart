@@ -108,8 +108,8 @@ class VisualFrame {
     required this.line,
     required this.checkpoint,
     required this.locals,
-    required this.read,
-    required this.write,
+    required this.reads,
+    required this.writes,
     required this.done,
   });
 
@@ -132,8 +132,8 @@ class VisualFrame {
     line: (json['line'] as num?)?.toInt() ?? 0,
     checkpoint: (json['checkpoint'] as num?)?.toInt() ?? -1,
     locals: (json['locals'] as Map?)?.cast<String, dynamic>() ?? const {},
-    read: MarkerData.fromJson(json['read']),
-    write: MarkerData.fromJson(json['write']),
+    reads: _markerList(json['reads'], fallback: json['read']),
+    writes: _markerList(json['writes'], fallback: json['write']),
     done: json['done'] == true,
   );
 
@@ -144,9 +144,27 @@ class VisualFrame {
   final int line;
   final int checkpoint;
   final Map<String, dynamic> locals;
-  final MarkerData read;
-  final MarkerData write;
+  final List<MarkerData> reads;
+  final List<MarkerData> writes;
   final bool done;
+
+  MarkerData get read => reads.isEmpty ? const MarkerData() : reads.last;
+  MarkerData get write => writes.isEmpty ? const MarkerData() : writes.last;
+}
+
+List<MarkerData> _markerList(dynamic value, {dynamic fallback}) {
+  final markers = <MarkerData>[];
+  if (value is List) {
+    for (final item in value) {
+      final marker = MarkerData.fromJson(item);
+      if (marker.list != null && marker.index != null) markers.add(marker);
+    }
+  }
+  if (markers.isEmpty) {
+    final marker = MarkerData.fromJson(fallback);
+    if (marker.list != null && marker.index != null) markers.add(marker);
+  }
+  return markers;
 }
 
 class BenchmarkPoint {
