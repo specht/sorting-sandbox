@@ -62,6 +62,33 @@ class SortingSandboxApp extends StatelessWidget {
             );
           }),
         ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(0, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
         sliderTheme: const SliderThemeData(
           trackHeight: 4,
           thumbShape: RoundSliderThumbShape(enabledThumbRadius: 10),
@@ -174,6 +201,28 @@ class _Home extends StatefulWidget {
 
 class _HomeState extends State<_Home> {
   int _page = 0;
+  late final PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _selectPage(int value) {
+    if (value == _page) return;
+    _pageController.animateToPage(
+      value,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
 
   void _showDiagnostics() {
     showDialog<void>(
@@ -244,7 +293,14 @@ class _HomeState extends State<_Home> {
           ),
         ],
       ),
-      body: IndexedStack(index: _page, children: pages),
+      body: PageView(
+        controller: _pageController,
+        onPageChanged: (value) {
+          if (_page == value) return;
+          setState(() => _page = value);
+        },
+        children: pages,
+      ),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
         child: Align(
@@ -271,8 +327,7 @@ class _HomeState extends State<_Home> {
                   backgroundColor: Colors.transparent,
                   elevation: 0,
                   selectedIndex: _page,
-                  onDestinationSelected: (value) =>
-                      setState(() => _page = value),
+                  onDestinationSelected: _selectPage,
                   destinations: const [
                     NavigationDestination(
                       icon: Icon(Icons.sort),

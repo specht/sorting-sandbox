@@ -359,6 +359,10 @@ class _RaceScreenState extends State<RaceScreen> {
         child: Text('Race needs at least two valid algorithms.'),
       );
     }
+    final wideLayout = MediaQuery.sizeOf(context).width >= 700;
+    final maxColumns = wideLayout ? 4 : 2;
+    final raceColumns = _lanes.length < maxColumns ? _lanes.length : maxColumns;
+
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -493,8 +497,8 @@ class _RaceScreenState extends State<RaceScreen> {
                   )
                 : GridView.builder(
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: _lanes.length <= 2 ? 2 : 2,
-                      childAspectRatio: 1.1,
+                      crossAxisCount: raceColumns,
+                      childAspectRatio: wideLayout ? 1.15 : 1.0,
                       crossAxisSpacing: 8,
                       mainAxisSpacing: 8,
                     ),
@@ -556,15 +560,6 @@ class _RaceScreenState extends State<RaceScreen> {
                                   baseColor: parseHexColor(
                                     lane.algorithm.color,
                                   ),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Expanded(
-                                child: ArrayView(
-                                  values: lane.scratch,
-                                  label: 'Scratch',
-                                  reservePointerGutter: false,
-                                  baseColor: Colors.grey,
                                 ),
                               ),
                               Text(

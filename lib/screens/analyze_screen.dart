@@ -254,10 +254,6 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                 ),
                 const SizedBox(width: 8),
                 FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 40),
-                    visualDensity: VisualDensity.compact,
-                  ),
                   onPressed: _running ? () => _stop() : _run,
                   icon: Icon(_running ? Icons.stop : Icons.query_stats),
                   label: Text(_running ? 'Stop' : 'Analyze all'),
@@ -413,8 +409,8 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                       ),
                   ],
                 ),
-                duration: const Duration(milliseconds: 650),
-                curve: Curves.easeInOutCubic,
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeOutCubic,
               ),
             ),
             Wrap(

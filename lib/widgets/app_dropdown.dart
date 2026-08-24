@@ -98,7 +98,14 @@ class AppDropdown<T> extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Expanded(child: selected?.child ?? const SizedBox.shrink()),
+            Expanded(
+              child: DefaultTextStyle.merge(
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+                child: selected?.child ?? const SizedBox.shrink(),
+              ),
+            ),
             const SizedBox(width: 10),
             Icon(
               Icons.expand_more_rounded,
