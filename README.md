@@ -117,6 +117,35 @@ Useful variants:
 ./run --algorithms /some/other/nested/repo
 ```
 
+## Build an Android APK
+
+Android uses the same Flutter UI and the same generated algorithm code as the
+web version. The only difference is isolation: browsers use a disposable Web
+Worker, while Android runs each algorithm in a disposable Dart isolate.
+
+With the class repository checked out as `algorithms/`, build an installable
+release APK with:
+
+```bash
+./build-apk
+```
+
+The command validates/instruments the current algorithms, embeds a native
+snapshot, generates an Android host from the **installed Flutter SDK**, and
+runs `flutter build apk --release`. The host lives in ignored `android/` and is
+regenerated on every `./build-apk`, so its Gradle/Android plugin versions stay
+matched to Flutter instead of being frozen in this repository.
+
+The resulting file is:
+
+```text
+build/app/outputs/flutter-apk/app-release.apk
+```
+
+Use `./build-apk` again after changing or pulling algorithms. The optional
+`ANDROID_ORG` environment variable changes the generated Android application
+namespace; it defaults to `de.hackschule`.
+
 ## Saving and pulling algorithms is live
 
 While `./run` is running, the watcher observes all student `.dart` files plus

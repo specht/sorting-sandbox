@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "$ROOT"
+
+command -v flutter >/dev/null 2>&1 || {
+  echo "flutter was not found in PATH" >&2
+  exit 127
+}
+command -v dart >/dev/null 2>&1 || {
+  echo "dart was not found in PATH" >&2
+  exit 127
+}
+
+ALGORITHMS="${SORTING_SANDBOX_ALGORITHMS:-$ROOT/algorithms}"
+ANDROID_ORG="${ANDROID_ORG:-de.hackschule}"
+if [[ ! -d "$ALGORITHMS" ]]; then
+  echo "Algorithm repository not found: $ALGORITHMS" >&2
+  exit 66
+fi
+
+echo "==> Application dependencies"
+flutter pub get
+
+echo "==> Preparing algorithms for native execution"
+dart run tool/build_algorithms.dart \
+  --repo "$ALGORITHMS" \
+  --no-compile-worker \
+  --native-snapshot
+
+echo "==> Generating Android host for this Flutter SDK"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+flutter create \
+  --no-pub \
+  --platforms=android \
+  --project-name sorting_sandbox \
+  --org "$ANDROID_ORG" \
+  "$tmp/host" >/dev/null
+rm -rf android
+mv "$tmp/host/android" android
+
+# The generated host is disposable; give the installed app a human title.
+manifest="android/app/src/main/AndroidManifest.xml"
+if [[ -f "$manifest" ]]; then
+  sed -i 's/android:label="sorting_sandbox"/android:label="Sorting Sandbox"/' "$manifest"
+fi
+
+echo "==> Building Android release APK"
+flutter build apk --release
+
+echo
+echo "✓ APK: build/app/outputs/flutter-apk/app-release.apk"

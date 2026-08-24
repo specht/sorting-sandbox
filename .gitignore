@@ -15,3 +15,12 @@ worker/generated/*
 !worker/generated/registry.g.dart
 worker/generated_next/
 worker/main_next.dart
+
+# Native algorithm snapshot embedded by ./build-apk.
+lib/generated/*
+!lib/generated/catalog.g.dart
+!lib/generated/registry.g.dart
+lib/generated_next/
+
+# The Android host is regenerated from the installed Flutter SDK by ./build-apk.
+/android/
