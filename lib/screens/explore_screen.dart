@@ -43,6 +43,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   String? _error;
   int _seed = 42;
   bool _catalogUpdatePending = false;
+  bool _showMemoryAccess = false;
 
   // Geometric-ish steps keep small teaching examples easy to select while
   // still allowing genuinely large inputs for fast algorithms.
@@ -304,6 +305,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       marker.list == list ? marker.index : null;
 
   Map<String, int> _indexVariables() {
+    if (!_running) return const {};
     final result = <String, int>{};
     for (final entry in _locals.entries) {
       final value = entry.value;
@@ -329,8 +331,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
           child: ArrayView(
             values: _numbers,
             label: 'List to be sorted',
-            readIndex: _markerIndex(_read, 'list'),
-            writeIndex: _markerIndex(_write, 'list'),
+            readIndex: _showMemoryAccess
+                ? _markerIndex(_read, 'list')
+                : null,
+            writeIndex: _showMemoryAccess
+                ? _markerIndex(_write, 'list')
+                : null,
             baseColor: _algorithm == null
                 ? null
                 : parseHexColor(_algorithm!.color),
@@ -344,8 +350,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
           child: ArrayView(
             values: _scratch,
             label: 'Temporary list',
-            readIndex: _markerIndex(_read, 'scratch'),
-            writeIndex: _markerIndex(_write, 'scratch'),
+            readIndex: _showMemoryAccess
+                ? _markerIndex(_read, 'scratch')
+                : null,
+            writeIndex: _showMemoryAccess
+                ? _markerIndex(_write, 'scratch')
+                : null,
             baseColor: Colors.grey,
           ),
         ),
@@ -409,11 +419,22 @@ class _ExploreScreenState extends State<ExploreScreen> {
       const SizedBox(height: 4),
       Wrap(
         alignment: WrapAlignment.center,
-        spacing: 14,
+        spacing: 8,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          _legendDot(Colors.orange, 'read'),
-          _legendDot(Theme.of(context).colorScheme.error, 'write'),
           _legendDot(Theme.of(context).colorScheme.primary, 'index variable'),
+          FilterChip(
+            selected: _showMemoryAccess,
+            avatar: const Icon(Icons.memory, size: 16),
+            label: const Text('Highlight reads/writes'),
+            onSelected: (value) =>
+                setState(() => _showMemoryAccess = value),
+          ),
+          if (_showMemoryAccess) ...[
+            _legendDot(Colors.orange, 'read'),
+            _legendDot(Theme.of(context).colorScheme.error, 'write'),
+          ],
         ],
       ),
     ],

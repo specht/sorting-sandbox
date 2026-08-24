@@ -26,8 +26,6 @@ class _RaceLane {
   List<int> numbers;
   List<int> scratch;
   MetricsData metrics = const MetricsData();
-  MarkerData read = const MarkerData();
-  MarkerData write = const MarkerData();
   AlgorithmWorker? worker;
   StreamSubscription<Map<String, dynamic>>? subscription;
   Timer? watchdog;
@@ -147,8 +145,6 @@ class _RaceScreenState extends State<RaceScreen> {
           lane.numbers = frame.numbers;
           lane.scratch = frame.scratch;
           lane.metrics = frame.metrics;
-          lane.read = frame.read;
-          lane.write = frame.write;
           lane.done = frame.done;
         });
         if (frame.done) {
@@ -185,8 +181,6 @@ class _RaceScreenState extends State<RaceScreen> {
 
   void _finishLane(_RaceLane lane) {
     lane.done = true;
-    lane.read = const MarkerData();
-    lane.write = const MarkerData();
     lane.watchdog?.cancel();
     lane.worker?.terminate();
     lane.worker = null;
@@ -221,9 +215,6 @@ class _RaceScreenState extends State<RaceScreen> {
       });
     }
   }
-
-  int? _marker(MarkerData marker, String list) =>
-      marker.list == list ? marker.index : null;
 
   @override
   Widget build(BuildContext context) {
@@ -377,8 +368,6 @@ class _RaceScreenState extends State<RaceScreen> {
                                 child: ArrayView(
                                   values: lane.numbers,
                                   label: 'List',
-                                  readIndex: _marker(lane.read, 'list'),
-                                  writeIndex: _marker(lane.write, 'list'),
                                   baseColor: parseHexColor(
                                     lane.algorithm.color,
                                   ),
@@ -389,8 +378,6 @@ class _RaceScreenState extends State<RaceScreen> {
                                 child: ArrayView(
                                   values: lane.scratch,
                                   label: 'Scratch',
-                                  readIndex: _marker(lane.read, 'scratch'),
-                                  writeIndex: _marker(lane.write, 'scratch'),
                                   baseColor: Colors.grey,
                                 ),
                               ),

@@ -100,27 +100,36 @@ class _ArrayPainter extends CustomPainter {
 
     final slot = size.width / values.length;
     final width = max(1.0, min(slot * .72, 8.0));
+    final arrayColor = baseColor ?? scheme.primary;
+    final lightColor = Color.lerp(arrayColor, Colors.white, 0.20)!;
+    final darkColor = Color.lerp(arrayColor, Colors.black, 0.10)!;
+    final arrayPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.bottomLeft,
+        end: Alignment.topRight,
+        colors: [darkColor, arrayColor, lightColor],
+        stops: const [0, 0.58, 1],
+      ).createShader(Offset.zero & size);
 
     for (var i = 0; i < values.length; i++) {
       if (values[i] <= 0) continue;
       final normalized = values[i] / maxValue;
-      final h = max(1.0, normalized * (size.height - 8));
+
+      // Presentation-only scaling: a gentle concave curve gives a sorted
+      // array the characteristic visual sweep of the original sandbox while
+      // preserving the ordering of all values.
+      final displayValue = pow(normalized, 0.68).toDouble();
+      final h = max(1.0, displayValue * (size.height - 8));
       final x = i * slot + (slot - width) / 2;
       final rect = Rect.fromLTWH(x, size.height - h, width, h);
-      final color = i == writeIndex
-          ? scheme.error
+      final paint = i == writeIndex
+          ? (Paint()..color = scheme.error)
           : i == readIndex
-              ? Colors.orange
-              : baseColor == null
-                  ? Color.lerp(scheme.primary, scheme.tertiary, normalized)!
-                  : Color.lerp(
-                      baseColor!.withValues(alpha: 0.48),
-                      baseColor!,
-                      normalized,
-                    )!;
+              ? (Paint()..color = Colors.orange)
+              : arrayPaint;
       canvas.drawRRect(
         RRect.fromRectAndRadius(rect, const Radius.circular(2)),
-        Paint()..color = color,
+        paint,
       );
     }
   }
