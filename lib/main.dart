@@ -26,13 +26,14 @@ class SortingSandboxApp extends StatelessWidget {
         colorScheme: colorScheme,
         scaffoldBackgroundColor: colorScheme.surface,
         appBarTheme: AppBarTheme(
-          backgroundColor: Colors.green.shade800,
-          foregroundColor: Colors.white,
+          backgroundColor: colorScheme.surface,
+          foregroundColor: colorScheme.onSurface,
           surfaceTintColor: Colors.transparent,
-          scrolledUnderElevation: 2,
+          elevation: 0,
+          scrolledUnderElevation: 0,
         ),
         navigationBarTheme: NavigationBarThemeData(
-          backgroundColor: colorScheme.surfaceContainer,
+          backgroundColor: Colors.transparent,
           indicatorColor: colorScheme.secondaryContainer,
         ),
         sliderTheme: const SliderThemeData(
@@ -217,17 +218,39 @@ class _HomeState extends State<_Home> {
         ],
       ),
       body: IndexedStack(index: _page, children: pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _page,
-        onDestinationSelected: (value) => setState(() => _page = value),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.sort), label: 'Explore'),
-          NavigationDestination(icon: Icon(Icons.sports_score), label: 'Race'),
-          NavigationDestination(
-            icon: Icon(Icons.query_stats),
-            label: 'Analyze',
+      bottomNavigationBar: SafeArea(
+        minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: Material(
+          color: colorScheme.surfaceContainerHigh,
+          surfaceTintColor: Colors.transparent,
+          elevation: 3,
+          shadowColor: Colors.black.withValues(alpha: 0.14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+            side: BorderSide(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+            ),
           ),
-        ],
+          clipBehavior: Clip.antiAlias,
+          child: NavigationBar(
+            height: 64,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            selectedIndex: _page,
+            onDestinationSelected: (value) => setState(() => _page = value),
+            destinations: const [
+              NavigationDestination(icon: Icon(Icons.sort), label: 'Explore'),
+              NavigationDestination(
+                icon: Icon(Icons.sports_score),
+                label: 'Race',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.query_stats),
+                label: 'Analyze',
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
