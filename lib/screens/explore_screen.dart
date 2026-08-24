@@ -14,11 +14,7 @@ import '../widgets/array_view.dart';
 import '../widgets/source_view.dart';
 
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({
-    super.key,
-    required this.catalog,
-    this.active = true,
-  });
+  const ExploreScreen({super.key, required this.catalog, this.active = true});
 
   final AlgorithmCatalog catalog;
   final bool active;
@@ -910,117 +906,118 @@ class _ExploreScreenState extends State<ExploreScreen> {
       child: Builder(
         builder: (controlsContext) => Column(
           children: [
-        AlgorithmPicker(
-          algorithms: widget.catalog.algorithms,
-          value: _algorithm,
-          enabled: !_running,
-          onChanged: (value) {
-            if (value == null) return;
-            // Selecting another implementation should show the untouched
-            // input immediately. Keep the exact same permutation so students
-            // can compare algorithms rather than accidentally comparing data.
-            setState(() {
-              _algorithm = value;
-              _restoreInputState();
-            });
-          },
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: AppDropdown<InputShape>(
-                label: 'Input',
-                value: _shape,
-                enabled: !_running,
-                items: [
-                  for (final shape in InputShape.values)
-                    DropdownMenuItem(
-                      value: shape,
-                      child: Text(inputShapeLabel(shape)),
-                    ),
-                ],
-                onChanged: (value) {
-                  if (value == null) return;
-                  _shape = value;
-                  _resetInput();
-                },
-              ),
+            AlgorithmPicker(
+              algorithms: widget.catalog.algorithms,
+              value: _algorithm,
+              enabled: !_running,
+              onChanged: (value) {
+                if (value == null) return;
+                // Selecting another implementation should show the untouched
+                // input immediately. Keep the exact same permutation so students
+                // can compare algorithms rather than accidentally comparing data.
+                setState(() {
+                  _algorithm = value;
+                  _restoreInputState();
+                });
+              },
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: _running ? null : _resetInput,
-              tooltip: 'New input',
-              icon: const Icon(Icons.shuffle),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: AppDropdown<InputShape>(
+                    label: 'Input',
+                    value: _shape,
+                    enabled: !_running,
+                    items: [
+                      for (final shape in InputShape.values)
+                        DropdownMenuItem(
+                          value: shape,
+                          child: Text(inputShapeLabel(shape)),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      _shape = value;
+                      _resetInput();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  onPressed: _running ? null : _resetInput,
+                  tooltip: 'New input',
+                  icon: const Icon(Icons.shuffle),
+                ),
+                IconButton(
+                  onPressed: _canStepBack ? _stepBack : null,
+                  tooltip: 'Previous checkpoint',
+                  icon: const Icon(Icons.skip_previous),
+                ),
+                IconButton(
+                  onPressed: _canStepForward ? _stepForward : null,
+                  tooltip: 'Next checkpoint',
+                  icon: const Icon(Icons.skip_next),
+                ),
+                IconButton(
+                  onPressed: _replaying ? null : _togglePause,
+                  tooltip: _viewingHistory
+                      ? 'Continue from this checkpoint'
+                      : (!_running ? 'Run' : (_paused ? 'Continue' : 'Pause')),
+                  icon: Icon(
+                    !_running
+                        ? Icons.play_arrow
+                        : (_paused ? Icons.play_arrow : Icons.pause),
+                  ),
+                ),
+                IconButton(
+                  onPressed: _running ? _stop : null,
+                  tooltip: 'Stop',
+                  icon: const Icon(Icons.stop),
+                ),
+              ],
             ),
-            IconButton(
-              onPressed: _canStepBack ? _stepBack : null,
-              tooltip: 'Previous checkpoint',
-              icon: const Icon(Icons.skip_previous),
+            _historyScrubber(controlsContext),
+            Row(
+              children: [
+                const SizedBox(width: 52, child: Text('Speed')),
+                Expanded(
+                  child: Slider(
+                    value: _speed.toDouble(),
+                    min: 0,
+                    max: 20,
+                    divisions: 20,
+                    label: '${_speed * 5}%',
+                    onChanged: (value) =>
+                        setState(() => _speed = value.round()),
+                  ),
+                ),
+                SizedBox(
+                  width: 52,
+                  child: Text('${_speed * 5}%', textAlign: TextAlign.end),
+                ),
+              ],
             ),
-            IconButton(
-              onPressed: _canStepForward ? _stepForward : null,
-              tooltip: 'Next checkpoint',
-              icon: const Icon(Icons.skip_next),
+            Row(
+              children: [
+                const SizedBox(width: 52, child: Text('Size')),
+                Expanded(
+                  child: Slider(
+                    value: _sizes.indexOf(_n).toDouble(),
+                    min: 0,
+                    max: (_sizes.length - 1).toDouble(),
+                    divisions: _sizes.length - 1,
+                    onChanged: _running
+                        ? null
+                        : (value) {
+                            _n = _sizes[value.round()];
+                            _resetInput();
+                          },
+                  ),
+                ),
+                SizedBox(width: 64, child: Text('n=$_n')),
+              ],
             ),
-            IconButton(
-              onPressed: _replaying ? null : _togglePause,
-              tooltip: _viewingHistory
-                  ? 'Continue from this checkpoint'
-                  : (!_running ? 'Run' : (_paused ? 'Continue' : 'Pause')),
-              icon: Icon(
-                !_running
-                    ? Icons.play_arrow
-                    : (_paused ? Icons.play_arrow : Icons.pause),
-              ),
-            ),
-            IconButton(
-              onPressed: _running ? _stop : null,
-              tooltip: 'Stop',
-              icon: const Icon(Icons.stop),
-            ),
-          ],
-        ),
-        _historyScrubber(controlsContext),
-        Row(
-          children: [
-            const SizedBox(width: 52, child: Text('Speed')),
-            Expanded(
-              child: Slider(
-                value: _speed.toDouble(),
-                min: 0,
-                max: 20,
-                divisions: 20,
-                label: '${_speed * 5}%',
-                onChanged: (value) => setState(() => _speed = value.round()),
-              ),
-            ),
-            SizedBox(
-              width: 52,
-              child: Text('${_speed * 5}%', textAlign: TextAlign.end),
-            ),
-          ],
-        ),
-        Row(
-          children: [
-            const SizedBox(width: 52, child: Text('Size')),
-            Expanded(
-              child: Slider(
-                value: _sizes.indexOf(_n).toDouble(),
-                min: 0,
-                max: (_sizes.length - 1).toDouble(),
-                divisions: _sizes.length - 1,
-                onChanged: _running
-                    ? null
-                    : (value) {
-                        _n = _sizes[value.round()];
-                        _resetInput();
-                      },
-              ),
-            ),
-            SizedBox(width: 64, child: Text('n=$_n')),
-          ],
-        ),
           ],
         ),
       ),
