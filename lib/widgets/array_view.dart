@@ -26,6 +26,12 @@ class ArrayView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final variableCounts = <int, int>{};
+    for (final index in indexVariables.values) {
+      if (index < 0 || index >= values.length) continue;
+      variableCounts.update(index, (count) => count + 1, ifAbsent: () => 1);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -52,7 +58,7 @@ class ArrayView extends StatelessWidget {
                             writeIndex: writeIndex,
                             scheme: Theme.of(context).colorScheme,
                             baseColor: baseColor,
-                            variableIndices: indexVariables.values.toSet(),
+                            variableCounts: variableCounts,
                           ),
                           child: const SizedBox.expand(),
                         ),
@@ -91,7 +97,7 @@ class _ArrayPainter extends CustomPainter {
     required this.writeIndex,
     required this.scheme,
     required this.baseColor,
-    required this.variableIndices,
+    required this.variableCounts,
   });
 
   final List<int> values;
@@ -99,7 +105,7 @@ class _ArrayPainter extends CustomPainter {
   final int? writeIndex;
   final ColorScheme scheme;
   final Color? baseColor;
-  final Set<int> variableIndices;
+  final Map<int, int> variableCounts;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -122,7 +128,7 @@ class _ArrayPainter extends CustomPainter {
       final h = max(1.0, displayValue * (size.height - 8));
       final x = i * slot + (slot - width) / 2;
       final rect = Rect.fromLTWH(x, size.height - h, width, h);
-      final isVariable = variableIndices.contains(i);
+      final variableCount = variableCounts[i] ?? 0;
       final lightColor = Color.lerp(arrayColor, Colors.white, 0.26)!;
       final darkColor = Color.lerp(arrayColor, Colors.black, 0.16)!;
       final paint = i == writeIndex
@@ -141,18 +147,14 @@ class _ArrayPainter extends CustomPainter {
         paint,
       );
 
-      // Keep index-variable emphasis deliberately tiny: a short cap at the
-      // top of the bar connects the pointer label to the value without
-      // changing the bar's apparent width or its gradient.
-      if (isVariable && i != readIndex && i != writeIndex) {
-        final capWidth = min(width * 0.65, 4.0);
-        canvas.drawLine(
-          Offset(rect.center.dx - capWidth / 2, rect.top + 1),
-          Offset(rect.center.dx + capWidth / 2, rect.top + 1),
-          Paint()
-            ..color = scheme.onSurface.withValues(alpha: 0.55)
-            ..strokeWidth = 1.25
-            ..strokeCap = StrokeCap.round,
+      // Variables tint the student's own color instead of replacing it. One
+      // variable is a light neutral wash; two or more are deliberately
+      // stronger. Read/write colors still take precedence when enabled.
+      if (variableCount > 0 && i != readIndex && i != writeIndex) {
+        final alpha = variableCount == 1 ? 0.30 : 0.60;
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(rect, const Radius.circular(2)),
+          Paint()..color = scheme.onSurface.withValues(alpha: alpha),
         );
       }
     }
@@ -165,7 +167,7 @@ class _ArrayPainter extends CustomPainter {
       oldDelegate.writeIndex != writeIndex ||
       oldDelegate.scheme != scheme ||
       oldDelegate.baseColor != baseColor ||
-      oldDelegate.variableIndices != variableIndices;
+      oldDelegate.variableCounts != variableCounts;
 }
 
 class _VariablePointerPainter extends CustomPainter {

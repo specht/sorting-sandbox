@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../color_utils.dart';
 import '../format_utils.dart';
@@ -13,9 +14,14 @@ import '../widgets/array_view.dart';
 import '../widgets/source_view.dart';
 
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key, required this.catalog});
+  const ExploreScreen({
+    super.key,
+    required this.catalog,
+    this.active = true,
+  });
 
   final AlgorithmCatalog catalog;
+  final bool active;
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -726,7 +732,14 @@ class _ExploreScreenState extends State<ExploreScreen> {
         runSpacing: 4,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          _legendDot(Theme.of(context).colorScheme.primary, 'index variable'),
+          _legendDot(
+            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.30),
+            '1 variable',
+          ),
+          _legendDot(
+            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.60),
+            '2+ variables',
+          ),
           FilterChip(
             selected: _showMemoryAccess,
             avatar: const Icon(Icons.memory, size: 16),
@@ -835,24 +848,29 @@ class _ExploreScreenState extends State<ExploreScreen> {
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
                 overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
               ),
-              child: Slider(
-                value: target.toDouble(),
-                min: 0,
-                max: maximum.toDouble(),
-                divisions: _latestCheckpoint > 0 && _latestCheckpoint <= 5000
-                    ? _latestCheckpoint
-                    : null,
-                label: hasCheckpoint ? 'step $target' : 'start',
-                onChanged: canScrub
-                    ? (value) => _previewScrub(value.round())
-                    : null,
-                onChangeEnd: canScrub
-                    ? (value) {
-                        final checkpoint = value.round();
-                        setState(() => _scrubTarget = null);
-                        _showCheckpoint(checkpoint);
-                      }
-                    : null,
+              child: ExcludeFocus(
+                child: Slider(
+                  value: target.toDouble(),
+                  min: 0,
+                  max: maximum.toDouble(),
+                  divisions: _latestCheckpoint > 0 && _latestCheckpoint <= 5000
+                      ? _latestCheckpoint
+                      : null,
+                  label: hasCheckpoint ? 'step $target' : 'start',
+                  onChangeStart: canScrub
+                      ? (_) => Focus.of(context).requestFocus()
+                      : null,
+                  onChanged: canScrub
+                      ? (value) => _previewScrub(value.round())
+                      : null,
+                  onChangeEnd: canScrub
+                      ? (value) {
+                          final checkpoint = value.round();
+                          setState(() => _scrubTarget = null);
+                          _showCheckpoint(checkpoint);
+                        }
+                      : null,
+                ),
               ),
             ),
           ),
@@ -870,8 +888,28 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   Widget _controls(BuildContext context) {
-    return Column(
-      children: [
+    return Focus(
+      key: ValueKey(widget.active),
+      autofocus: widget.active,
+      canRequestFocus: widget.active,
+      onKeyEvent: (_, event) {
+        if (!widget.active || event is! KeyDownEvent || _replaying) {
+          return KeyEventResult.ignored;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.arrowLeft && _canStepBack) {
+          _stepBack();
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.arrowRight &&
+            _canStepForward) {
+          _stepForward();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Builder(
+        builder: (controlsContext) => Column(
+          children: [
         AlgorithmPicker(
           algorithms: widget.catalog.algorithms,
           value: _algorithm,
@@ -943,7 +981,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ),
           ],
         ),
-        _historyScrubber(context),
+        _historyScrubber(controlsContext),
         Row(
           children: [
             const SizedBox(width: 52, child: Text('Speed')),
@@ -983,7 +1021,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
             SizedBox(width: 64, child: Text('n=$_n')),
           ],
         ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 

@@ -184,7 +184,7 @@ class _HomeState extends State<_Home> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      ExploreScreen(catalog: widget.catalog),
+      ExploreScreen(catalog: widget.catalog, active: _page == 0),
       RaceScreen(catalog: widget.catalog),
       AnalyzeScreen(catalog: widget.catalog),
     ];
