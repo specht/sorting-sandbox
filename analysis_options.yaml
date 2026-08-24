@@ -6,9 +6,6 @@ analyzer:
     - worker/generated/**
     # Native copies are generated from the same already-validated sources.
     - lib/generated/**
-    # Nested packages/repos have their own analysis pass in ./check.
-    - algorithms/**
-    - packages/**
     # Flutter 3.47 upgrades older projects to exclude generated build/platform trees.
     - build/**
     - android/**
