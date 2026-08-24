@@ -6,6 +6,7 @@ import '../color_utils.dart';
 import '../input_factory.dart';
 import '../models.dart';
 import '../worker_client.dart';
+import '../widgets/app_dropdown.dart';
 import '../widgets/array_view.dart';
 
 class RaceScreen extends StatefulWidget {
@@ -184,6 +185,8 @@ class _RaceScreenState extends State<RaceScreen> {
 
   void _finishLane(_RaceLane lane) {
     lane.done = true;
+    lane.read = const MarkerData();
+    lane.write = const MarkerData();
     lane.watchdog?.cancel();
     lane.worker?.terminate();
     lane.worker = null;
@@ -246,11 +249,12 @@ class _RaceScreenState extends State<RaceScreen> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  SizedBox(
-                    height: 90,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 124),
                     child: SingleChildScrollView(
                       child: Wrap(
                         spacing: 6,
+                        runSpacing: 6,
                         children: [
                           for (final algorithm in widget.catalog.algorithms)
                             FilterChip(
@@ -266,55 +270,69 @@ class _RaceScreenState extends State<RaceScreen> {
                       ),
                     ),
                   ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: DropdownButton<InputShape>(
-                          isExpanded: true,
-                          value: _shape,
-                          items: [
-                            for (final s in InputShape.values)
-                              DropdownMenuItem(
-                                value: s,
-                                child: Text(inputShapeLabel(s)),
-                              ),
-                          ],
-                          onChanged: _running
-                              ? null
-                              : (value) =>
-                                    setState(() => _shape = value ?? _shape),
+                  const SizedBox(height: 10),
+                  AppDropdown<InputShape>(
+                    label: 'Input',
+                    value: _shape,
+                    enabled: !_running,
+                    items: [
+                      for (final s in InputShape.values)
+                        DropdownMenuItem(
+                          value: s,
+                          child: Text(inputShapeLabel(s)),
                         ),
-                      ),
-                      Expanded(
-                        child: Slider(
-                          value: _sizes.indexOf(_n).toDouble(),
-                          min: 0,
-                          max: (_sizes.length - 1).toDouble(),
-                          divisions: _sizes.length - 1,
-                          label: 'n=$_n',
-                          onChanged: _running
-                              ? null
-                              : (v) => setState(() => _n = _sizes[v.round()]),
-                        ),
-                      ),
-                      Expanded(
-                        child: Slider(
-                          value: _speed.toDouble(),
-                          min: 0,
-                          max: 5,
-                          divisions: 5,
-                          label: 'speed',
-                          onChanged: (v) => setState(() => _speed = v.round()),
-                        ),
-                      ),
-                      FilledButton.icon(
-                        onPressed: _running
-                            ? () => _stop()
-                            : (_selected.length >= 2 ? _start : null),
-                        icon: Icon(_running ? Icons.stop : Icons.flag),
-                        label: Text(_running ? 'Stop' : 'Race'),
-                      ),
                     ],
+                    onChanged: (value) =>
+                        setState(() => _shape = value ?? _shape),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Size'),
+                      Text('n=$_n'),
+                    ],
+                  ),
+                  Slider(
+                    value: _sizes.indexOf(_n).toDouble(),
+                    min: 0,
+                    max: (_sizes.length - 1).toDouble(),
+                    divisions: _sizes.length - 1,
+                    label: 'n=$_n',
+                    onChanged: _running
+                        ? null
+                        : (v) => setState(() => _n = _sizes[v.round()]),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Speed'),
+                      Text('${_speed + 1} / 6'),
+                    ],
+                  ),
+                  Slider(
+                    value: _speed.toDouble(),
+                    min: 0,
+                    max: 5,
+                    divisions: 5,
+                    label: 'speed ${_speed + 1}',
+                    onChanged: (v) => setState(() => _speed = v.round()),
+                  ),
+                  const SizedBox(height: 4),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                      ),
+                      onPressed: _running
+                          ? () => _stop()
+                          : (_selected.length >= 2 ? _start : null),
+                      icon: Icon(
+                        _running ? Icons.stop : Icons.sports_score,
+                      ),
+                      label: Text(_running ? 'Stop race' : 'Race'),
+                    ),
                   ),
                 ],
               ),
@@ -373,9 +391,7 @@ class _RaceScreenState extends State<RaceScreen> {
                                   label: 'Scratch',
                                   readIndex: _marker(lane.read, 'scratch'),
                                   writeIndex: _marker(lane.write, 'scratch'),
-                                  baseColor: parseHexColor(
-                                    lane.algorithm.color,
-                                  ).withValues(alpha: 0.72),
+                                  baseColor: Colors.grey,
                                 ),
                               ),
                               Text(

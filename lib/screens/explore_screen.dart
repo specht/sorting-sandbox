@@ -7,6 +7,7 @@ import '../input_factory.dart';
 import '../models.dart';
 import '../worker_client.dart';
 import '../widgets/algorithm_picker.dart';
+import '../widgets/app_dropdown.dart';
 import '../widgets/array_view.dart';
 import '../widgets/source_view.dart';
 
@@ -244,6 +245,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _paused = false;
       _requestId = null;
       _atCheckpoint = false;
+      _read = const MarkerData();
+      _write = const MarkerData();
       if (_catalogUpdatePending) {
         _algorithm = _mappedAlgorithm();
         _catalogUpdatePending = false;
@@ -262,6 +265,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _requestId = null;
       _atCheckpoint = false;
       _error = message;
+      _read = const MarkerData();
+      _write = const MarkerData();
       if (_catalogUpdatePending) {
         _algorithm = _mappedAlgorithm();
         _catalogUpdatePending = false;
@@ -285,6 +290,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
       setState(() {
         _running = false;
         _paused = false;
+        _read = const MarkerData();
+        _write = const MarkerData();
         if (_catalogUpdatePending) {
           _algorithm = _mappedAlgorithm();
           _catalogUpdatePending = false;
@@ -295,6 +302,17 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   int? _markerIndex(MarkerData marker, String list) =>
       marker.list == list ? marker.index : null;
+
+  Map<String, int> _indexVariables() {
+    final result = <String, int>{};
+    for (final entry in _locals.entries) {
+      final value = entry.value;
+      if (value is int && value >= 0 && value < _numbers.length) {
+        result[entry.key] = value;
+      }
+    }
+    return result;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -316,6 +334,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             baseColor: _algorithm == null
                 ? null
                 : parseHexColor(_algorithm!.color),
+            indexVariables: _indexVariables(),
           ),
         ),
         const SizedBox(height: 8),
@@ -327,9 +346,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             label: 'Temporary list',
             readIndex: _markerIndex(_read, 'scratch'),
             writeIndex: _markerIndex(_write, 'scratch'),
-            baseColor: _algorithm == null
-                ? null
-                : parseHexColor(_algorithm!.color).withValues(alpha: 0.72),
+            baseColor: Colors.grey,
           ),
         ),
         const SizedBox(height: 10),
@@ -379,12 +396,35 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  Widget _stats(BuildContext context) => Row(
-    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+  Widget _stats(BuildContext context) => Column(
     children: [
-      Text('Reads: ${_short(_metrics.reads)}'),
-      Text('Writes: ${_short(_metrics.writes)}'),
-      Text('Comparisons: ${_short(_metrics.comparisons)}'),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          Text('Reads: ${_short(_metrics.reads)}'),
+          Text('Writes: ${_short(_metrics.writes)}'),
+          Text('Comparisons: ${_short(_metrics.comparisons)}'),
+        ],
+      ),
+      const SizedBox(height: 4),
+      Wrap(
+        alignment: WrapAlignment.center,
+        spacing: 14,
+        children: [
+          _legendDot(Colors.orange, 'read'),
+          _legendDot(Theme.of(context).colorScheme.error, 'write'),
+          _legendDot(Theme.of(context).colorScheme.primary, 'index variable'),
+        ],
+      ),
+    ],
+  );
+
+  Widget _legendDot(Color color, String label) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(Icons.circle, color: color, size: 9),
+      const SizedBox(width: 4),
+      Text(label, style: const TextStyle(fontSize: 11)),
     ],
   );
 
@@ -450,14 +490,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
         Row(
           children: [
             Expanded(
-              child: DropdownButtonFormField<InputShape>(
-                key: ValueKey(_shape),
-                initialValue: _shape,
-                decoration: const InputDecoration(
-                  labelText: 'Input',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
+              child: AppDropdown<InputShape>(
+                label: 'Input',
+                value: _shape,
+                enabled: !_running,
                 items: [
                   for (final shape in InputShape.values)
                     DropdownMenuItem(
@@ -465,13 +501,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
                       child: Text(inputShapeLabel(shape)),
                     ),
                 ],
-                onChanged: _running
-                    ? null
-                    : (value) {
-                        if (value == null) return;
-                        _shape = value;
-                        _resetInput();
-                      },
+                onChanged: (value) {
+                  if (value == null) return;
+                  _shape = value;
+                  _resetInput();
+                },
               ),
             ),
             const SizedBox(width: 8),

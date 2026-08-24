@@ -8,15 +8,7 @@ import '../color_utils.dart';
 import '../input_factory.dart';
 import '../models.dart';
 import '../worker_client.dart';
-
-enum Normalization { raw, n, nLogN, nSquared }
-
-String _normalizationLabel(Normalization value) => switch (value) {
-  Normalization.raw => 'operations',
-  Normalization.n => 'operations / n',
-  Normalization.nLogN => 'operations / (n log n)',
-  Normalization.nSquared => 'operations / n²',
-};
+import '../widgets/app_dropdown.dart';
 
 class AnalyzeScreen extends StatefulWidget {
   const AnalyzeScreen({super.key, required this.catalog});
@@ -30,7 +22,8 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
   final Map<String, AnalysisData> _results = {};
   final List<AlgorithmWorker> _workers = [];
   InputShape _shape = InputShape.random;
-  Normalization _normalization = Normalization.raw;
+  bool _logX = false;
+  bool _logY = false;
   bool _running = false;
   int _generation = 0;
   bool _catalogUpdatePending = false;
@@ -206,58 +199,55 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Wrap(
-          spacing: 10,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            SizedBox(
-              width: 190,
-              child: DropdownButtonFormField<InputShape>(
-                key: ValueKey(_shape),
-                initialValue: _shape,
-                decoration: const InputDecoration(
-                  labelText: 'Input shape',
-                  border: OutlineInputBorder(),
-                  isDense: true,
-                ),
-                items: [
-                  for (final s in InputShape.values)
-                    DropdownMenuItem(value: s, child: Text(inputShapeLabel(s))),
-                ],
-                onChanged: _running
-                    ? null
-                    : (v) => setState(() => _shape = v ?? _shape),
-              ),
+            AppDropdown<InputShape>(
+              label: 'Input shape',
+              value: _shape,
+              enabled: !_running,
+              items: [
+                for (final shape in InputShape.values)
+                  DropdownMenuItem(
+                    value: shape,
+                    child: Text(inputShapeLabel(shape)),
+                  ),
+              ],
+              onChanged: (value) => setState(() => _shape = value ?? _shape),
             ),
-            SizedBox(
-              width: 210,
-              child: DropdownButtonFormField<Normalization>(
-                key: ValueKey(_normalization),
-                initialValue: _normalization,
-                decoration: const InputDecoration(
-                  labelText: 'Graph',
-                  border: OutlineInputBorder(),
-                  isDense: true,
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                FilterChip(
+                  selected: _logX,
+                  label: const Text('Logarithmic x-axis'),
+                  onSelected: (value) => setState(() => _logX = value),
                 ),
-                items: [
-                  for (final n in Normalization.values)
-                    DropdownMenuItem(
-                      value: n,
-                      child: Text(_normalizationLabel(n)),
-                    ),
-                ],
-                onChanged: (v) =>
-                    setState(() => _normalization = v ?? _normalization),
-              ),
+                FilterChip(
+                  selected: _logY,
+                  label: const Text('Logarithmic y-axis'),
+                  onSelected: (value) => setState(() => _logY = value),
+                ),
+              ],
             ),
+            const SizedBox(height: 6),
+            Text(
+              'Sandbox score = reads + writes + comparisons',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 10),
             FilledButton.icon(
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(48),
+              ),
               onPressed: _running ? () => _stop() : _run,
               icon: Icon(_running ? Icons.stop : Icons.query_stats),
-              label: Text(_running ? 'Stop' : 'Analyze all'),
+              label: Text(_running ? 'Stop analysis' : 'Analyze all'),
             ),
-            const Text('Sandbox score = reads + writes + comparisons'),
           ],
         ),
       ),
@@ -283,10 +273,15 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
 
   Widget _chart(BuildContext context) {
     final resultCatalog = _resultsCatalog ?? widget.catalog;
-    final valid = resultCatalog.algorithms.where((a) {
-      final result = _results[a.id];
+    final valid = resultCatalog.algorithms.where((algorithm) {
+      final result = _results[algorithm.id];
       return result != null && result.correct && result.benchmarks.isNotEmpty;
-    }).toList();
+    }).toList()
+      ..sort(
+        (a, b) => _aggregateScore(
+          _results[a.id]!,
+        ).compareTo(_aggregateScore(_results[b.id]!)),
+      );
 
     if (valid.isEmpty) {
       return const Card(
@@ -301,15 +296,15 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              _normalizationLabel(_normalization),
+              _chartTitle(),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             Expanded(
               child: LineChart(
                 LineChartData(
-                  minX: _sizes.first.toDouble(),
-                  maxX: _sizes.last.toDouble(),
+                  minX: _plotX(_sizes.first),
+                  maxX: _plotX(_sizes.last),
                   gridData: const FlGridData(show: false),
                   borderData: FlBorderData(show: false),
                   titlesData: FlTitlesData(
@@ -319,15 +314,22 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                     rightTitles: const AxisTitles(
                       sideTitles: SideTitles(showTitles: false),
                     ),
-                    leftTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 48,
+                        getTitlesWidget: (value, meta) => Text(
+                          _yAxisLabel(value),
+                          style: const TextStyle(fontSize: 9),
+                        ),
+                      ),
                     ),
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 24,
                         getTitlesWidget: (value, meta) => Text(
-                          '${value.toInt()}',
+                          _xAxisLabel(value),
                           style: const TextStyle(fontSize: 10),
                         ),
                       ),
@@ -344,8 +346,8 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                           for (final point
                               in _results[algorithm.id]!.benchmarks)
                             FlSpot(
-                              point.n.toDouble(),
-                              _normalized(point).toDouble(),
+                              _plotX(point.n),
+                              _plotY(point.metrics.score),
                             ),
                         ],
                       ),
@@ -381,39 +383,95 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     );
   }
 
-  double _normalized(BenchmarkPoint point) {
-    final score = point.metrics.score.toDouble();
-    final n = max(1, point.n).toDouble();
-    return switch (_normalization) {
-      Normalization.raw => score,
-      Normalization.n => score / n,
-      Normalization.nLogN => score / max(1.0, n * log(n)),
-      Normalization.nSquared => score / (n * n),
-    };
+  String _chartTitle() {
+    if (_logX && _logY) return 'Sandbox score · logarithmic x/y';
+    if (_logX) return 'Sandbox score · logarithmic x';
+    if (_logY) return 'Sandbox score · logarithmic y';
+    return 'Sandbox score';
+  }
+
+  double _plotX(int n) => _logX ? log(max(1, n)) / ln10 : n.toDouble();
+
+  double _plotY(int score) =>
+      _logY ? log(max(1, score)) / ln10 : score.toDouble();
+
+  String _xAxisLabel(double value) {
+    final n = _logX ? pow(10, value).round() : value.round();
+    return _short(n);
+  }
+
+  String _yAxisLabel(double value) {
+    final score = _logY ? pow(10, value).round() : value.round();
+    return _short(score);
+  }
+
+  int _aggregateScore(AnalysisData result) => result.benchmarks.fold(
+    0,
+    (sum, point) => sum + point.metrics.score,
+  );
+
+  List<AlgorithmMeta> _orderedAlgorithms() {
+    final algorithms = List<AlgorithmMeta>.from(
+      (_resultsCatalog ?? widget.catalog).algorithms,
+    );
+    algorithms.sort((a, b) {
+      final ar = _results[a.id];
+      final br = _results[b.id];
+      final aValid = ar != null && ar.correct && ar.benchmarks.isNotEmpty;
+      final bValid = br != null && br.correct && br.benchmarks.isNotEmpty;
+      if (aValid != bValid) return aValid ? -1 : 1;
+      if (aValid && bValid) {
+        return _aggregateScore(ar!).compareTo(_aggregateScore(br!));
+      }
+      return '${a.author}/${a.name}'.compareTo('${b.author}/${b.name}');
+    });
+    return algorithms;
   }
 
   Widget _table(BuildContext context) {
+    final algorithms = _orderedAlgorithms();
+    final ranks = <String, int>{};
+    var nextRank = 1;
+    for (final algorithm in algorithms) {
+      final result = _results[algorithm.id];
+      if (result != null && result.correct && result.benchmarks.isNotEmpty) {
+        ranks[algorithm.id] = nextRank++;
+      }
+    }
+
     return Card(
-      child: ListView(
-        padding: const EdgeInsets.all(8),
-        children: [
-          for (final algorithm
-              in (_resultsCatalog ?? widget.catalog).algorithms)
-            _resultTile(context, algorithm),
-        ],
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        itemCount: algorithms.length,
+        separatorBuilder: (_, _) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final algorithm = algorithms[index];
+          return _resultTile(
+            context,
+            algorithm,
+            rank: ranks[algorithm.id],
+          );
+        },
       ),
     );
   }
 
-  Widget _resultTile(BuildContext context, AlgorithmMeta algorithm) {
+  Widget _resultTile(
+    BuildContext context,
+    AlgorithmMeta algorithm, {
+    required int? rank,
+  }) {
     final result = _results[algorithm.id];
     if (result == null) {
       return ListTile(
-        dense: true,
-        leading: Icon(
-          Icons.circle,
-          size: 12,
-          color: parseHexColor(algorithm.color),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        leading: SizedBox(
+          width: 32,
+          child: Icon(
+            Icons.circle,
+            size: 12,
+            color: parseHexColor(algorithm.color),
+          ),
         ),
         title: Text('${algorithm.name} · ${algorithm.author}'),
         trailing: _running
@@ -428,6 +486,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     final latest = result.benchmarks.isEmpty
         ? null
         : result.benchmarks.last.metrics;
+    final aggregate = result.benchmarks.isEmpty ? null : _aggregateScore(result);
     final status = result.timeout
         ? 'TIMEOUT'
         : result.error != null
@@ -438,20 +497,91 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
         ? 'correct · stable (tested)'
         : 'correct · unstable';
 
-    return ListTile(
-      dense: true,
-      leading: Icon(
-        Icons.circle,
-        size: 12,
-        color: parseHexColor(algorithm.color),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 40,
+            child: rank == null
+                ? Padding(
+                    padding: const EdgeInsets.only(top: 7),
+                    child: Icon(
+                      Icons.circle,
+                      size: 12,
+                      color: parseHexColor(algorithm.color),
+                    ),
+                  )
+                : CircleAvatar(
+                    radius: 15,
+                    backgroundColor: parseHexColor(
+                      algorithm.color,
+                    ).withValues(alpha: 0.16),
+                    foregroundColor: parseHexColor(algorithm.color),
+                    child: Text('$rank'),
+                  ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${algorithm.name} · ${algorithm.author}',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(status, style: Theme.of(context).textTheme.bodySmall),
+                if (latest != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'At n=${_sizes.last}',
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 2,
+                    children: [
+                      Text('Reads ${_short(latest.reads)}'),
+                      Text('Writes ${_short(latest.writes)}'),
+                      Text('Comparisons ${_short(latest.comparisons)}'),
+                    ],
+                  ),
+                ] else if (result.failingCase != null) ...[
+                  const SizedBox(height: 4),
+                  Text('Failing case: ${result.failingCase}'),
+                ],
+              ],
+            ),
+          ),
+          if (aggregate != null) ...[
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  _short(aggregate),
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                Text(
+                  'aggregate score',
+                  style: Theme.of(context).textTheme.labelSmall,
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
-      title: Text('${algorithm.name} · ${algorithm.author}'),
-      subtitle: Text(
-        latest == null
-            ? '$status${result.failingCase == null ? '' : ' · case ${result.failingCase}'}'
-            : '$status · n=${_sizes.last}: R ${latest.reads}, W ${latest.writes}, C ${latest.comparisons}',
-      ),
-      trailing: latest == null ? null : Text('${latest.score}'),
     );
+  }
+
+  String _short(int value) {
+    if (value < 1000) return '$value';
+    if (value < 1000000) return '${(value / 1000).toStringAsFixed(1)}k';
+    if (value < 1000000000) {
+      return '${(value / 1000000).toStringAsFixed(1)}M';
+    }
+    return '${(value / 1000000000).toStringAsFixed(1)}G';
   }
 }

@@ -11,6 +11,7 @@ class ArrayView extends StatelessWidget {
     this.writeIndex,
     this.emptyHint,
     this.baseColor,
+    this.indexVariables = const {},
   });
 
   final List<int> values;
@@ -19,6 +20,7 @@ class ArrayView extends StatelessWidget {
   final int? writeIndex;
   final String? emptyHint;
   final Color? baseColor;
+  final Map<String, int> indexVariables;
 
   @override
   Widget build(BuildContext context) {
@@ -31,18 +33,41 @@ class ArrayView extends StatelessWidget {
               color: Theme.of(context).colorScheme.surfaceContainerLowest,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: values.isEmpty && emptyHint != null
-                ? Center(child: Text(emptyHint!, style: Theme.of(context).textTheme.bodySmall))
-                : CustomPaint(
-                    painter: _ArrayPainter(
-                      values: values,
-                      readIndex: readIndex,
-                      writeIndex: writeIndex,
-                      scheme: Theme.of(context).colorScheme,
-                      baseColor: baseColor,
+            child: Column(
+              children: [
+                Expanded(
+                  child: values.isEmpty && emptyHint != null
+                      ? Center(
+                          child: Text(
+                            emptyHint!,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        )
+                      : CustomPaint(
+                          painter: _ArrayPainter(
+                            values: values,
+                            readIndex: readIndex,
+                            writeIndex: writeIndex,
+                            scheme: Theme.of(context).colorScheme,
+                            baseColor: baseColor,
+                          ),
+                          child: const SizedBox.expand(),
+                        ),
+                ),
+                if (indexVariables.isNotEmpty)
+                  SizedBox(
+                    height: 28,
+                    child: CustomPaint(
+                      painter: _VariablePointerPainter(
+                        length: values.length,
+                        variables: indexVariables,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      child: const SizedBox.expand(),
                     ),
-                    child: const SizedBox.expand(),
                   ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 6),
@@ -70,15 +95,16 @@ class _ArrayPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (values.isEmpty) return;
-    final maxValue = max(1, values.reduce(max));
-    final minValue = values.reduce(min);
-    final range = max(1, maxValue - minValue + 1);
+    final maxValue = values.reduce(max);
+    if (maxValue <= 0) return;
+
     final slot = size.width / values.length;
     final width = max(1.0, min(slot * .72, 8.0));
 
     for (var i = 0; i < values.length; i++) {
-      final normalized = (values[i] - minValue + 1) / range;
-      final h = max(2.0, normalized * (size.height - 8));
+      if (values[i] <= 0) continue;
+      final normalized = values[i] / maxValue;
+      final h = max(1.0, normalized * (size.height - 8));
       final x = i * slot + (slot - width) / 2;
       final rect = Rect.fromLTWH(x, size.height - h, width, h);
       final color = i == writeIndex
@@ -106,4 +132,70 @@ class _ArrayPainter extends CustomPainter {
       oldDelegate.writeIndex != writeIndex ||
       oldDelegate.scheme != scheme ||
       oldDelegate.baseColor != baseColor;
+}
+
+class _VariablePointerPainter extends CustomPainter {
+  _VariablePointerPainter({
+    required this.length,
+    required this.variables,
+    required this.color,
+  });
+
+  final int length;
+  final Map<String, int> variables;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (length <= 0 || variables.isEmpty) return;
+
+    final byIndex = <int, List<String>>{};
+    for (final entry in variables.entries) {
+      if (entry.value < 0 || entry.value >= length) continue;
+      byIndex.putIfAbsent(entry.value, () => []).add(entry.key);
+    }
+
+    final slot = size.width / length;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.fill;
+
+    for (final entry in byIndex.entries) {
+      final x = (entry.key + 0.5) * slot;
+      final arrow = Path()
+        ..moveTo(x, 0)
+        ..lineTo(x - 4, 6)
+        ..lineTo(x + 4, 6)
+        ..close();
+      canvas.drawPath(arrow, paint);
+      canvas.drawLine(Offset(x, 5), Offset(x, 10), paint);
+
+      final label = entry.value.join(', ');
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: TextStyle(
+            color: color,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+      )..layout(maxWidth: size.width);
+
+      final left = (x - textPainter.width / 2).clamp(
+        0.0,
+        max(0.0, size.width - textPainter.width),
+      ).toDouble();
+      textPainter.paint(canvas, Offset(left, 11));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _VariablePointerPainter oldDelegate) =>
+      oldDelegate.length != length ||
+      oldDelegate.variables != variables ||
+      oldDelegate.color != color;
 }

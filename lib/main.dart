@@ -17,12 +17,29 @@ class SortingSandboxApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = ColorScheme.fromSeed(seedColor: Colors.green);
     return MaterialApp(
       title: 'Sorting Sandbox',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff356b39)),
+        colorScheme: colorScheme,
+        scaffoldBackgroundColor: colorScheme.surface,
+        appBarTheme: AppBarTheme(
+          backgroundColor: colorScheme.surface,
+          foregroundColor: colorScheme.onSurface,
+          surfaceTintColor: colorScheme.surfaceTint,
+          scrolledUnderElevation: 2,
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: colorScheme.surfaceContainer,
+          indicatorColor: colorScheme.secondaryContainer,
+        ),
+        sliderTheme: const SliderThemeData(
+          trackHeight: 4,
+          thumbShape: RoundSliderThumbShape(enabledThumbRadius: 10),
+          overlayShape: RoundSliderOverlayShape(overlayRadius: 18),
+        ),
       ),
       home: const _CatalogLoader(),
     );
@@ -202,7 +219,10 @@ class _HomeState extends State<_Home> {
         onDestinationSelected: (value) => setState(() => _page = value),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.sort), label: 'Explore'),
-          NavigationDestination(icon: Icon(Icons.flag), label: 'Race'),
+          NavigationDestination(
+            icon: Icon(Icons.sports_score),
+            label: 'Race',
+          ),
           NavigationDestination(icon: Icon(Icons.query_stats), label: 'Analyze'),
         ],
       ),

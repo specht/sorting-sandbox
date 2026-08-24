@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../color_utils.dart';
 import '../models.dart';
+import 'app_dropdown.dart';
 
 class AlgorithmPicker extends StatelessWidget {
   const AlgorithmPicker({
@@ -22,14 +23,10 @@ class AlgorithmPicker extends StatelessWidget {
     final selectedId = value != null && algorithms.any((a) => a.id == value!.id)
         ? value!.id
         : null;
-    return DropdownButtonFormField<String>(
-      key: ValueKey(selectedId),
-      initialValue: selectedId,
-      decoration: const InputDecoration(
-        labelText: 'Algorithm',
-        border: OutlineInputBorder(),
-        isDense: true,
-      ),
+    return AppDropdown<String>(
+      label: 'Algorithm',
+      value: selectedId,
+      enabled: enabled,
       items: [
         for (final algorithm in algorithms)
           DropdownMenuItem(
@@ -44,11 +41,9 @@ class AlgorithmPicker extends StatelessWidget {
             ),
           ),
       ],
-      onChanged: enabled
-          ? (id) => onChanged(
-                id == null ? null : algorithms.firstWhere((a) => a.id == id),
-              )
-          : null,
+      onChanged: (id) => onChanged(
+        id == null ? null : algorithms.firstWhere((a) => a.id == id),
+      ),
     );
   }
 }
