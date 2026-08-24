@@ -582,12 +582,18 @@ _DefinitionResult _extractDefinition({
   }
 
   String? name;
+  String? displayAuthor;
+  var hasAuthorGetter = false;
   String? color;
   MethodDeclaration? sortMethod;
   for (final member in algorithmClass.body.members.whereType<MethodDeclaration>()) {
     if (member.name.lexeme == 'sort' && !member.isGetter) sortMethod = member;
     if (member.isGetter && member.name.lexeme == 'name') {
       name = _literalGetter(member);
+    }
+    if (member.isGetter && member.name.lexeme == 'author') {
+      hasAuthorGetter = true;
+      displayAuthor = _literalGetter(member);
     }
     if (member.isGetter && member.name.lexeme == 'color') {
       color = _colorGetter(member);
@@ -620,6 +626,12 @@ _DefinitionResult _extractDefinition({
       "Use a literal name getter, e.g. get name => 'Bubble Sort';",
     );
   }
+  if (hasAuthorGetter &&
+      (displayAuthor == null || displayAuthor!.trim().isEmpty)) {
+    return _DefinitionResult.error(
+      "Use a literal author getter, e.g. get author => 'Anna';",
+    );
+  }
   if (color == null || !_validColor(color)) {
     return _DefinitionResult.error(
       "Use Colors.green or a hex color such as get color => '#4CAF50';",
@@ -631,7 +643,7 @@ _DefinitionResult _extractDefinition({
   return _DefinitionResult.ok(
     AlgorithmDefinition(
       id: stem,
-      author: author,
+      author: displayAuthor?.trim() ?? author,
       name: name,
       color: color,
       className: _className(algorithmClass),

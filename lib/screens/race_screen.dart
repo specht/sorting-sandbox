@@ -55,6 +55,7 @@ class _RaceScreenState extends State<RaceScreen> {
   int _speed = 12;
   InputShape _shape = InputShape.random;
   int _seed = 100;
+  List<int> _previewInput = const [];
   bool _catalogUpdatePending = false;
 
   static const _sizes = [
@@ -127,6 +128,7 @@ class _RaceScreenState extends State<RaceScreen> {
     for (final algorithm in widget.catalog.algorithms.take(2)) {
       _selected.add(algorithm.id);
     }
+    _refreshPreview(newInput: true);
   }
 
   @override
@@ -137,6 +139,7 @@ class _RaceScreenState extends State<RaceScreen> {
       _catalogUpdatePending = true;
     } else {
       _syncSelection();
+      _refreshPreview();
       _catalogUpdatePending = false;
     }
   }
@@ -158,6 +161,20 @@ class _RaceScreenState extends State<RaceScreen> {
     }
   }
 
+  void _refreshPreview({bool newInput = false}) {
+    if (newInput || _previewInput.length != _n) {
+      _previewInput = makeInput(_n, _shape, seed: ++_seed);
+    }
+    final algorithms = widget.catalog.algorithms
+        .where((algorithm) => _selected.contains(algorithm.id))
+        .toList();
+    _lanes
+      ..clear()
+      ..addAll(
+        algorithms.map((algorithm) => _RaceLane(algorithm, _previewInput)),
+      );
+  }
+
   void _toggle(AlgorithmMeta algorithm, bool value) {
     if (_running) return;
     setState(() {
@@ -166,13 +183,15 @@ class _RaceScreenState extends State<RaceScreen> {
       } else {
         _selected.remove(algorithm.id);
       }
+      _refreshPreview();
     });
   }
 
   Future<void> _start() async {
     if (_running || _selected.length < 2) return;
     _stop(updateState: false);
-    final input = makeInput(_n, _shape, seed: ++_seed);
+    if (_previewInput.length != _n) _refreshPreview(newInput: true);
+    final input = List<int>.from(_previewInput);
     final algorithms = widget.catalog.algorithms
         .where((a) => _selected.contains(a.id))
         .toList();
@@ -389,21 +408,6 @@ class _RaceScreenState extends State<RaceScreen> {
                             ),
                           ),
                           const SizedBox(height: 10),
-                          AppDropdown<InputShape>(
-                            label: 'Input',
-                            value: _shape,
-                            enabled: !_running,
-                            items: [
-                              for (final s in InputShape.values)
-                                DropdownMenuItem(
-                                  value: s,
-                                  child: Text(inputShapeLabel(s)),
-                                ),
-                            ],
-                            onChanged: (value) =>
-                                setState(() => _shape = value ?? _shape),
-                          ),
-                          const SizedBox(height: 10),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [const Text('Size'), Text('n=$_n')],
@@ -416,7 +420,10 @@ class _RaceScreenState extends State<RaceScreen> {
                             label: 'n=$_n',
                             onChanged: _running
                                 ? null
-                                : (v) => setState(() => _n = _sizes[v.round()]),
+                                : (v) => setState(() {
+                                    _n = _sizes[v.round()];
+                                    _refreshPreview(newInput: true);
+                                  }),
                           ),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -435,16 +442,43 @@ class _RaceScreenState extends State<RaceScreen> {
                                 setState(() => _speed = v.round()),
                           ),
                           const SizedBox(height: 4),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size.fromHeight(48),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: AppDropdown<InputShape>(
+                                  label: 'Input',
+                                  value: _shape,
+                                  enabled: !_running,
+                                  items: [
+                                    for (final shape in InputShape.values)
+                                      DropdownMenuItem(
+                                        value: shape,
+                                        child: Text(inputShapeLabel(shape)),
+                                      ),
+                                  ],
+                                  onChanged: (value) {
+                                    if (value == null) return;
+                                    setState(() {
+                                      _shape = value;
+                                      _refreshPreview(newInput: true);
+                                    });
+                                  },
+                                ),
                               ),
-                              onPressed: _selected.length >= 2 ? _start : null,
-                              icon: const Icon(Icons.sports_score),
-                              label: const Text('Race'),
-                            ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                flex: 2,
+                                child: FilledButton.icon(
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: const Size.fromHeight(52),
+                                  ),
+                                  onPressed: _selected.length >= 2 ? _start : null,
+                                  icon: const Icon(Icons.sports_score),
+                                  label: const Text('Race'),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

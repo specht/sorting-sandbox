@@ -669,12 +669,25 @@ class _ExploreScreenState extends State<ExploreScreen> {
       if (marker.list == list && marker.index != null) marker.index!,
   };
 
+  bool _canPointOnePastEnd(String name) {
+    final normalized = name.toLowerCase();
+    if (normalized == 'length' ||
+        normalized == 'size' ||
+        normalized == 'count' ||
+        normalized == 'n') {
+      return false;
+    }
+    return !normalized.endsWith('length') && !normalized.endsWith('count');
+  }
+
   Map<String, int> _indexVariables() {
     if (!_running && !_viewingHistory) return const {};
     final result = <String, int>{};
     for (final entry in _locals.entries) {
       final value = entry.value;
-      if (value is int && value >= 0 && value <= _numbers.length) {
+      if (value is! int || value < 0) continue;
+      if (value < _numbers.length ||
+          (value == _numbers.length && _canPointOnePastEnd(entry.key))) {
         result[entry.key] = value;
       }
     }
@@ -802,7 +815,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           ),
           if (_showMemoryAccess) ...[
             _legendDot(Colors.orangeAccent, 'read'),
-            _legendDot(const Color(0xFFFFA8B5), 'write'),
+            _legendDot(Colors.redAccent, 'write'),
           ],
         ],
       ),
@@ -958,12 +971,22 @@ class _ExploreScreenState extends State<ExploreScreen> {
               ),
             ),
           ),
-          SizedBox(
-            width: 112,
-            child: Text(
-              hasCheckpoint ? 'step $target / $_latestCheckpoint' : 'start',
-              textAlign: TextAlign.end,
-              style: Theme.of(context).textTheme.labelSmall,
+          Tooltip(
+            message: hasCheckpoint
+                ? 'step $target / $_latestCheckpoint'
+                : 'Execution has not started yet',
+            child: SizedBox(
+              width: 112,
+              child: Text(
+                hasCheckpoint
+                    ? 'step ${_short(target)} / ${_short(_latestCheckpoint)}'
+                    : 'start',
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.fade,
+                textAlign: TextAlign.end,
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
             ),
           ),
         ],

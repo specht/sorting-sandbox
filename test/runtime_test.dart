@@ -83,6 +83,45 @@ void main() {
     session.finish();
   });
 
+  test('coarse playback keeps only the latest step memory markers', () async {
+    final frames = <Map<String, Object?>>[];
+    final session = CheckpointSession(emitFrame: frames.add);
+    final list = Elements.runtime(
+      probe: session.probe,
+      label: 'list',
+      values: [3, 2, 1],
+    );
+
+    final first = session.checkpoint(30, const {});
+    await Future<void>.delayed(Duration.zero);
+    session.addBudget(2);
+    await first;
+
+    final a = list[0];
+    list[1] = a;
+    await session.checkpoint(31, const {}); // skipped and discarded
+
+    final b = list[1];
+    list[2] = b;
+    final emitted = session.checkpoint(32, const {});
+    await Future<void>.delayed(Duration.zero);
+
+    final reads = (frames.last['reads'] as List)
+        .cast<Map>()
+        .map((marker) => marker['index'])
+        .toSet();
+    final writes = (frames.last['writes'] as List)
+        .cast<Map>()
+        .map((marker) => marker['index'])
+        .toSet();
+    expect(reads, {1});
+    expect(writes, {2});
+
+    session.addBudget(1);
+    await emitted;
+    session.finish();
+  });
+
   test('visual checkpoints carry deterministic sequence numbers', () async {
     final frames = <Map<String, Object?>>[];
     final session = CheckpointSession(emitFrame: frames.add);

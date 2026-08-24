@@ -176,28 +176,35 @@ class _ArrayPainter extends CustomPainter {
         );
       }
 
-      // Memory activity should annotate the student's bar, not replace it.
-      // Reads get a warm cap; writes get a pink outline. Multiple writes in a
-      // single source step therefore remain visible at the same time.
-      if (readIndices.contains(i)) {
-        final capHeight = min(rect.height, 3.5);
-        canvas.drawRRect(
-          RRect.fromRectAndCorners(
-            Rect.fromLTWH(rect.left, rect.top, rect.width, capHeight),
-            topLeft: const Radius.circular(2),
-            topRight: const Radius.circular(2),
-          ),
-          Paint()..color = Colors.orangeAccent,
-        );
-      }
-      if (writeIndices.contains(i)) {
-        canvas.drawRRect(
-          rounded.inflate(0.8),
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.6
-            ..color = const Color(0xFFFFA8B5),
-        );
+      // Keep memory activity compact and readable without replacing the
+      // student's color. Reads use an orange cap and writes a red cap. If an
+      // element was both read and written in this source step, stack the caps.
+      final isRead = readIndices.contains(i);
+      final isWrite = writeIndices.contains(i);
+      if (isRead || isWrite) {
+        final capCount = isRead && isWrite ? 2 : 1;
+        final capHeight = min(rect.height / capCount, 3.5);
+        if (isRead) {
+          canvas.drawRRect(
+            RRect.fromRectAndCorners(
+              Rect.fromLTWH(rect.left, rect.top, rect.width, capHeight),
+              topLeft: const Radius.circular(2),
+              topRight: const Radius.circular(2),
+            ),
+            Paint()..color = Colors.orangeAccent,
+          );
+        }
+        if (isWrite) {
+          final top = rect.top + (isRead ? capHeight : 0);
+          canvas.drawRRect(
+            RRect.fromRectAndCorners(
+              Rect.fromLTWH(rect.left, top, rect.width, capHeight),
+              topLeft: isRead ? Radius.zero : const Radius.circular(2),
+              topRight: isRead ? Radius.zero : const Radius.circular(2),
+            ),
+            Paint()..color = Colors.redAccent,
+          );
+        }
       }
     }
   }

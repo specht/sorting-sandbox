@@ -107,6 +107,15 @@ class ProbeState implements OperationProbe {
     return result;
   }
 
+  void discardMarkers() {
+    _reads.clear();
+    _writes.clear();
+    readList = null;
+    readIndex = null;
+    writeList = null;
+    writeIndex = null;
+  }
+
   List<Map<String, Object>> _takeMarkers(Map<String, Set<int>> source) {
     final result = <Map<String, Object>>[];
     final labels = source.keys.toList()..sort();
@@ -162,7 +171,13 @@ class CheckpointSession {
 
     if (_budget > 0) {
       _budget--;
-      if (_budget > 0) return;
+      if (_budget > 0) {
+        // A coarse animation frame can skip many source checkpoints. Memory
+        // highlighting should still describe only the final logical step,
+        // exactly like single-step mode, rather than all skipped work.
+        probe.discardMarkers();
+        return;
+      }
     }
 
     _emit(done: false);

@@ -30,11 +30,13 @@ abstract final class Colors {
 /// Marker base class for one sorting algorithm.
 ///
 /// Student implementations provide [name], [color] and a synchronous `sort`
-/// method. `sort` is intentionally not declared here: the build tool creates
-/// a second, asynchronous visual version without changing the student's file.
+/// method. [author] is optional; when omitted, the sandbox uses the student
+/// directory name. `sort` is intentionally not declared here: the build tool
+/// creates a second, asynchronous visual version without changing the file.
 abstract class SortingAlgorithm {
   String get name;
   String get color;
+  String? get author => null;
 }
 
 /// One sortable item.

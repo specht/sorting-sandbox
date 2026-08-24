@@ -288,6 +288,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
   }
 
   Widget _chart(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final resultCatalog = _resultsCatalog ?? widget.catalog;
     final valid =
         resultCatalog.algorithms.where((algorithm) {
@@ -325,6 +326,41 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
             Expanded(
               child: LineChart(
                 LineChartData(
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipColor: (_) => scheme.surfaceContainerLowest,
+                      tooltipBorder: BorderSide(color: scheme.outlineVariant),
+                      tooltipBorderRadius: BorderRadius.circular(10),
+                      tooltipPadding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      tooltipMargin: 10,
+                      maxContentWidth: 88,
+                      fitInsideHorizontally: true,
+                      fitInsideVertically: true,
+                      getTooltipItems: (spots) => [
+                        for (final spot in spots)
+                          LineTooltipItem(
+                            _short(
+                              _results[valid[spot.barIndex].id]!
+                                  .benchmarks[spot.spotIndex]
+                                  .metrics
+                                  .score,
+                            ),
+                            TextStyle(
+                              color: Color.lerp(
+                                parseHexColor(valid[spot.barIndex].color),
+                                scheme.onSurface,
+                                0.50,
+                              ),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                   minX: _plotX(_sizes.first),
                   maxX: _plotX(_sizes.last),
                   gridData: const FlGridData(show: false),
@@ -481,6 +517,8 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     AlgorithmMeta algorithm, {
     required int? rank,
   }) {
+    final scheme = Theme.of(context).colorScheme;
+    final algorithmColor = parseHexColor(algorithm.color);
     final result = _results[algorithm.id];
     if (result == null) {
       return ListTile(
@@ -541,20 +579,20 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: parseHexColor(
-                        algorithm.color,
-                      ).withValues(alpha: 0.22),
+                      color: algorithmColor.withValues(alpha: 0.22),
                       border: Border.all(
-                        color: parseHexColor(
-                          algorithm.color,
-                        ).withValues(alpha: 0.52),
+                        color: algorithmColor.withValues(alpha: 0.58),
                       ),
                     ),
                     child: Text(
                       '$rank',
                       style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w700,
+                        color: Color.lerp(
+                          algorithmColor,
+                          scheme.onSurface,
+                          0.62,
+                        ),
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
@@ -566,23 +604,42 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
               children: [
                 Text(
                   '${algorithm.name} · ${algorithm.author}',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: scheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(height: 2),
-                Text(status, style: Theme.of(context).textTheme.bodySmall),
+                Text(
+                  status,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
                 if (latest != null) ...[
                   const SizedBox(height: 6),
                   Text(
                     'At n=${_sizes.last}',
-                    style: Theme.of(context).textTheme.labelMedium,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: scheme.outline,
+                    ),
                   ),
                   Wrap(
                     spacing: 12,
                     runSpacing: 2,
                     children: [
-                      Text('${_short(latest.reads)} reads'),
-                      Text('${_short(latest.writes)} writes'),
-                      Text('${_short(latest.comparisons)} comparisons'),
+                      Text(
+                        '${_short(latest.reads)} reads',
+                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
+                      Text(
+                        '${_short(latest.writes)} writes',
+                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
+                      Text(
+                        '${_short(latest.comparisons)} comparisons',
+                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
                     ],
                   ),
                 ] else if (result.failingCase != null) ...[
