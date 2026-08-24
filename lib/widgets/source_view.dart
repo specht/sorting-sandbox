@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'dart_syntax.dart';
+
 class SourceView extends StatelessWidget {
   const SourceView({super.key, required this.source, required this.line});
 
@@ -12,7 +14,7 @@ class SourceView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lines = source.split('\n');
+    final lines = highlightDartSource(source);
     final scheme = Theme.of(context).colorScheme;
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -52,12 +54,21 @@ class SourceView extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    lines[index],
-                    style: const TextStyle(
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        for (final token in lines[index])
+                          TextSpan(
+                            text: token.text,
+                            style: syntaxStyle(token.kind, scheme),
+                          ),
+                      ],
+                    ),
+                    style: TextStyle(
                       fontFamily: _monoFamily,
                       fontSize: 16.5,
                       height: 1.40,
+                      color: scheme.onSurface,
                     ),
                   ),
                 ),
