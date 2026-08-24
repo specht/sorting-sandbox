@@ -131,6 +131,18 @@ class _ArrayPainter extends CustomPainter {
       final variableCount = variableCounts[i] ?? 0;
       final lightColor = Color.lerp(arrayColor, Colors.white, 0.26)!;
       final darkColor = Color.lerp(arrayColor, Colors.black, 0.16)!;
+      final middleFocus = variableCount == 1
+          ? 0.10
+          : variableCount > 1
+          ? 0.28
+          : 0.0;
+      final topFocus = variableCount == 1
+          ? 0.45
+          : variableCount > 1
+          ? 0.85
+          : 0.0;
+      final middleColor = Color.lerp(arrayColor, scheme.primary, middleFocus)!;
+      final topColor = Color.lerp(lightColor, scheme.primary, topFocus)!;
       final paint = i == writeIndex
           ? (Paint()..color = scheme.error)
           : i == readIndex
@@ -139,7 +151,7 @@ class _ArrayPainter extends CustomPainter {
               ..shader = LinearGradient(
                 begin: Alignment.bottomCenter,
                 end: Alignment.topCenter,
-                colors: [darkColor, arrayColor, lightColor],
+                colors: [darkColor, middleColor, topColor],
                 stops: const [0, 0.58, 1],
               ).createShader(rect));
       canvas.drawRRect(
@@ -147,16 +159,10 @@ class _ArrayPainter extends CustomPainter {
         paint,
       );
 
-      // Variables tint the student's own color instead of replacing it. One
-      // variable is a light neutral wash; two or more are deliberately
-      // stronger. Read/write colors still take precedence when enabled.
-      if (variableCount > 0 && i != readIndex && i != writeIndex) {
-        final alpha = variableCount == 1 ? 0.30 : 0.60;
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(rect, const Radius.circular(2)),
-          Paint()..color = scheme.onSurface.withValues(alpha: alpha),
-        );
-      }
+      // Index variables steer the student's own gradient toward the neutral
+      // focus color instead of covering the bar. One variable gives a clear
+      // cool highlight; two or more push the gradient much further.
+      // Read/write colors still take precedence.
     }
   }
 

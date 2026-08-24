@@ -21,9 +21,11 @@ class RaceScreen extends StatefulWidget {
 class _RaceLane {
   _RaceLane(this.algorithm, List<int> initial)
     : numbers = List<int>.from(initial),
-      scratch = List<int>.filled(initial.length, 0);
+      scratch = List<int>.filled(initial.length, 0),
+      expected = (List<int>.from(initial)..sort());
 
   final AlgorithmMeta algorithm;
+  final List<int> expected;
   List<int> numbers;
   List<int> scratch;
   MetricsData metrics = const MetricsData();
@@ -31,7 +33,17 @@ class _RaceLane {
   StreamSubscription<Map<String, dynamic>>? subscription;
   Timer? watchdog;
   bool done = false;
+  bool completed = false;
+  bool? correct;
   String? error;
+
+  bool matchesExpected(List<int> values) {
+    if (values.length != expected.length) return false;
+    for (var i = 0; i < values.length; i++) {
+      if (values[i] != expected[i]) return false;
+    }
+    return true;
+  }
 }
 
 class _RaceScreenState extends State<RaceScreen> {
@@ -195,6 +207,10 @@ class _RaceScreenState extends State<RaceScreen> {
           lane.scratch = frame.scratch;
           lane.metrics = frame.metrics;
           lane.done = frame.done;
+          if (frame.done) {
+            lane.completed = true;
+            lane.correct = lane.matchesExpected(frame.numbers);
+          }
         });
         if (frame.done) {
           _finishLane(lane);
@@ -456,11 +472,39 @@ class _RaceScreenState extends State<RaceScreen> {
                           padding: const EdgeInsets.all(8),
                           child: Column(
                             children: [
-                              Text(
-                                '${lane.algorithm.name} · ${lane.algorithm.author}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      '${lane.algorithm.name} · ${lane.algorithm.author}',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  if (lane.completed &&
+                                      lane.correct != null) ...[
+                                    const SizedBox(width: 5),
+                                    Tooltip(
+                                      message: lane.correct!
+                                          ? 'Sorted correctly'
+                                          : 'Finished, but result is incorrect',
+                                      child: Icon(
+                                        lane.correct!
+                                            ? Icons.check_circle_rounded
+                                            : Icons.error_rounded,
+                                        size: 17,
+                                        color: lane.correct!
+                                            ? const Color(0xFF6EE7B7)
+                                            : Theme.of(
+                                                context,
+                                              ).colorScheme.error,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                               if (lane.error != null)
                                 Text(

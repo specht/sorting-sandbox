@@ -3,15 +3,24 @@ import 'package:flutter/material.dart';
 class SourceView extends StatelessWidget {
   const SourceView({super.key, required this.source, required this.line});
 
+  static const _monoFamily = 'DejaVu Sans Mono';
+  static const _monoFallback = [
+    'Liberation Mono',
+    'Consolas',
+    'Menlo',
+    'monospace',
+  ];
+
   final String source;
   final int line;
 
   @override
   Widget build(BuildContext context) {
     final lines = source.split('\n');
+    final scheme = Theme.of(context).colorScheme;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        color: scheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(12),
       ),
       child: ListView.builder(
@@ -21,8 +30,13 @@ class SourceView extends StatelessWidget {
           final number = index + 1;
           final selected = number == line;
           return Container(
-            color: selected
-                ? Theme.of(context).colorScheme.primaryContainer
+            decoration: selected
+                ? BoxDecoration(
+                    color: scheme.primary.withValues(alpha: 0.12),
+                    border: Border(
+                      left: BorderSide(color: scheme.primary, width: 3),
+                    ),
+                  )
                 : null,
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
             child: Row(
@@ -34,8 +48,9 @@ class SourceView extends StatelessWidget {
                     '$number',
                     textAlign: TextAlign.right,
                     style: TextStyle(
-                      fontFamily: 'monospace',
-                      color: Theme.of(context).colorScheme.outline,
+                      fontFamily: _monoFamily,
+                      fontFamilyFallback: _monoFallback,
+                      color: scheme.outline,
                     ),
                   ),
                 ),
@@ -44,8 +59,10 @@ class SourceView extends StatelessWidget {
                   child: Text(
                     lines[index],
                     style: const TextStyle(
-                      fontFamily: 'monospace',
+                      fontFamily: _monoFamily,
+                      fontFamilyFallback: _monoFallback,
                       fontSize: 12.5,
+                      height: 1.35,
                     ),
                   ),
                 ),

@@ -17,11 +17,28 @@ class SortingSandboxApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = ColorScheme.fromSeed(seedColor: Colors.green);
+    const focusColor = Color(0xFF7DD3FC);
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: focusColor,
+          brightness: Brightness.dark,
+        ).copyWith(
+          surface: const Color(0xFF101114),
+          surfaceContainerLowest: const Color(0xFF0B0C0F),
+          surfaceContainerLow: const Color(0xFF15171B),
+          surfaceContainer: const Color(0xFF191B20),
+          surfaceContainerHigh: const Color(0xFF202329),
+          surfaceContainerHighest: const Color(0xFF292C33),
+          onSurface: const Color(0xFFE9EAF0),
+          onSurfaceVariant: const Color(0xFFB8BBC4),
+          outline: const Color(0xFF7C808A),
+          outlineVariant: const Color(0xFF3B3E46),
+        );
     return MaterialApp(
       title: 'Sorting Sandbox',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
+      themeMode: ThemeMode.dark,
+      darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: colorScheme,
         scaffoldBackgroundColor: colorScheme.surface,
@@ -34,7 +51,16 @@ class SortingSandboxApp extends StatelessWidget {
         ),
         navigationBarTheme: NavigationBarThemeData(
           backgroundColor: Colors.transparent,
-          indicatorColor: colorScheme.secondaryContainer,
+          indicatorColor: focusColor.withValues(alpha: 0.18),
+          labelTextStyle: WidgetStateProperty.resolveWith((states) {
+            final selected = states.contains(WidgetState.selected);
+            return TextStyle(
+              color: selected
+                  ? colorScheme.onSurface
+                  : colorScheme.onSurfaceVariant,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+            );
+          }),
         ),
         sliderTheme: const SliderThemeData(
           trackHeight: 4,
@@ -221,35 +247,47 @@ class _HomeState extends State<_Home> {
       body: IndexedStack(index: _page, children: pages),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: Material(
-          color: colorScheme.surfaceContainerHigh,
-          surfaceTintColor: Colors.transparent,
-          elevation: 3,
-          shadowColor: Colors.black.withValues(alpha: 0.14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(28),
-            side: BorderSide(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: SizedBox(
+              width: double.infinity,
+              child: Material(
+                color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.97),
+                surfaceTintColor: Colors.transparent,
+                elevation: 8,
+                shadowColor: Colors.black.withValues(alpha: 0.38),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(28),
+                  side: BorderSide(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.72),
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: NavigationBar(
+                  height: 64,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  selectedIndex: _page,
+                  onDestinationSelected: (value) =>
+                      setState(() => _page = value),
+                  destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.sort),
+                      label: 'Explore',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.sports_score),
+                      label: 'Race',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.query_stats),
+                      label: 'Analyze',
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: NavigationBar(
-            height: 64,
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            selectedIndex: _page,
-            onDestinationSelected: (value) => setState(() => _page = value),
-            destinations: const [
-              NavigationDestination(icon: Icon(Icons.sort), label: 'Explore'),
-              NavigationDestination(
-                icon: Icon(Icons.sports_score),
-                label: 'Race',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.query_stats),
-                label: 'Analyze',
-              ),
-            ],
           ),
         ),
       ),

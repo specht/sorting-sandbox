@@ -54,6 +54,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
   bool _replaying = false;
   int? _replayTarget;
   bool _continueAfterReplay = false;
+  bool _advanceAfterReplay = false;
+  bool _completed = false;
+  bool? _completionCorrect;
 
   // Geometric-ish steps keep small teaching examples easy to select while
   // still allowing genuinely large inputs for fast algorithms.
@@ -181,9 +184,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
   bool get _canStepBack => _canBrowseHistory && _currentCheckpoint > 0;
 
   bool get _canStepForward {
+    if (_replaying || _error != null) return false;
     if (_currentCheckpoint < 0) return !_running;
     if (_currentCheckpoint < _latestCheckpoint) return _canBrowseHistory;
-    return _running && _paused && _atCheckpoint && !_replaying;
+    if (_completed) return false;
+    if (_running) return _paused && _atCheckpoint;
+    return true;
   }
 
   int get _historyLimit {
@@ -202,6 +208,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _replaying = false;
     _replayTarget = null;
     _continueAfterReplay = false;
+    _advanceAfterReplay = false;
+    _completed = false;
+    _completionCorrect = null;
   }
 
   void _applyFrameState(VisualFrame frame) {
@@ -279,6 +288,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     bool paused = false,
     int? replayCheckpoint,
     bool continueAfterReplay = false,
+    bool advanceAfterReplay = false,
   }) async {
     final algorithm = _algorithm;
     if (algorithm == null) return;
@@ -287,6 +297,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
     if (replayCheckpoint == null) {
       _history.clear();
       _historyCursor = -1;
+      _completed = false;
+      _completionCorrect = null;
     }
 
     final worker = AlgorithmWorker(workerPath: widget.catalog.workerPath);
@@ -311,7 +323,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           _atCheckpoint = true;
         });
         if (frame.done) {
-          _finish();
+          _finish(completed: true);
         } else if (_paused) {
           _watchdog?.cancel();
           _watchdog = null;
@@ -319,7 +331,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
           _scheduleAdvance(requestId);
         }
       } else if (type == 'complete') {
-        _finish();
+        _finish(completed: true);
       } else if (type == 'error') {
         _fail(message['message']?.toString() ?? 'Algorithm worker error');
       }
@@ -333,6 +345,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _replaying = replayCheckpoint != null;
       _replayTarget = replayCheckpoint;
       _continueAfterReplay = continueAfterReplay;
+      _advanceAfterReplay = advanceAfterReplay;
     });
 
     worker.send({
@@ -362,17 +375,23 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
 
     final continueRunning = _continueAfterReplay && !frame.done;
+    final advanceOne = _advanceAfterReplay && !frame.done;
     setState(() {
       _applyFrameState(frame);
       _recordFrameState(frame);
       _replaying = false;
       _replayTarget = null;
       _continueAfterReplay = false;
+      _advanceAfterReplay = false;
       _paused = !continueRunning;
       _atCheckpoint = true;
     });
 
-    if (continueRunning) {
+    if (frame.done) {
+      _finish(completed: true);
+    } else if (advanceOne) {
+      _sendAdvance(1, requestId: requestId);
+    } else if (continueRunning) {
       _scheduleAdvance(requestId);
     } else {
       _watchdog?.cancel();
@@ -414,7 +433,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
       return;
     }
     if (!_running) {
-      _start();
+      if (_completed) return;
+      if (_currentCheckpoint >= 0) {
+        unawaited(_resumeFromHistory(continueRunning: true));
+      } else {
+        _start();
+      }
       return;
     }
     if (_replaying) return;
@@ -443,8 +467,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _showCheckpoint(_currentCheckpoint + 1);
       return;
     }
-    if (_running && _paused && _atCheckpoint && !_replaying) {
+    if (_completed || _error != null || _replaying) return;
+    if (_running && _paused && _atCheckpoint) {
       _sendAdvance(1);
+      return;
+    }
+    if (!_running) {
+      unawaited(
+        _start(
+          paused: true,
+          replayCheckpoint: _currentCheckpoint,
+          advanceAfterReplay: true,
+        ),
+      );
     }
   }
 
@@ -530,6 +565,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _historyCursor = _history.length - 1;
       _latestCheckpoint = target;
       _scrubTarget = null;
+      _completed = false;
+      _completionCorrect = null;
     });
 
     await _start(
@@ -539,8 +576,18 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  void _finish() {
+  bool _matchesExpectedInput() {
+    if (_numbers.length != _input.length) return false;
+    final expected = List<int>.from(_input)..sort();
+    for (var i = 0; i < expected.length; i++) {
+      if (_numbers[i] != expected[i]) return false;
+    }
+    return true;
+  }
+
+  void _finish({required bool completed}) {
     if (!mounted) return;
+    final correct = completed ? _matchesExpectedInput() : null;
     setState(() {
       _running = false;
       _paused = false;
@@ -551,6 +598,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _replaying = false;
       _replayTarget = null;
       _continueAfterReplay = false;
+      _advanceAfterReplay = false;
+      _completed = completed;
+      _completionCorrect = correct;
       if (_catalogUpdatePending) {
         _algorithm = _mappedAlgorithm();
         _catalogUpdatePending = false;
@@ -574,6 +624,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _replaying = false;
       _replayTarget = null;
       _continueAfterReplay = false;
+      _advanceAfterReplay = false;
+      _completed = false;
+      _completionCorrect = null;
       if (_catalogUpdatePending) {
         _algorithm = _mappedAlgorithm();
         _catalogUpdatePending = false;
@@ -596,6 +649,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _replaying = false;
     _replayTarget = null;
     _continueAfterReplay = false;
+    _advanceAfterReplay = false;
     if (updateState && mounted) {
       setState(() {
         _running = false;
@@ -728,14 +782,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
         runSpacing: 4,
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
+          if (_completed) _completionBadge(context),
           _legendDot(
-            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.30),
+            Theme.of(context).colorScheme.primary.withValues(alpha: 0.58),
             '1 variable',
           ),
-          _legendDot(
-            Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.60),
-            '2+ variables',
-          ),
+          _legendDot(Theme.of(context).colorScheme.primary, '2+ variables'),
           FilterChip(
             selected: _showMemoryAccess,
             avatar: const Icon(Icons.memory, size: 16),
@@ -750,6 +802,36 @@ class _ExploreScreenState extends State<ExploreScreen> {
       ),
     ],
   );
+
+  Widget _completionBadge(BuildContext context) {
+    final correct = _completionCorrect == true;
+    final color = correct
+        ? const Color(0xFF6EE7B7)
+        : Theme.of(context).colorScheme.error;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.42)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            correct ? Icons.check_circle_rounded : Icons.error_rounded,
+            size: 14,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            correct ? 'Sorted correctly' : 'Finished, result incorrect',
+            style: TextStyle(fontSize: 11, color: color),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _legendDot(Color color, String label) => Row(
     mainAxisSize: MainAxisSize.min,
@@ -889,8 +971,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
       autofocus: widget.active,
       canRequestFocus: widget.active,
       onKeyEvent: (_, event) {
-        if (!widget.active || event is! KeyDownEvent || _replaying) {
-          return KeyEventResult.ignored;
+        if (!widget.active || _replaying) return KeyEventResult.ignored;
+        final isPress = event is KeyDownEvent || event is KeyRepeatEvent;
+        if (!isPress) return KeyEventResult.ignored;
+
+        if (event.logicalKey == LogicalKeyboardKey.space) {
+          if (event is KeyDownEvent) _togglePause();
+          return KeyEventResult.handled;
         }
         if (event.logicalKey == LogicalKeyboardKey.arrowLeft && _canStepBack) {
           _stepBack();
