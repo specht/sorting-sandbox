@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
 import '../color_utils.dart';
+import '../format_utils.dart';
 import '../input_factory.dart';
 import '../models.dart';
 import '../worker_client.dart';
@@ -295,9 +296,13 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              _chartTitle(),
-              style: Theme.of(context).textTheme.titleMedium,
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              child: Text(
+                _chartTitle(),
+                key: ValueKey((_logX, _logY)),
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
             ),
             const SizedBox(height: 8),
             Expanded(
@@ -353,6 +358,8 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                       ),
                   ],
                 ),
+                duration: const Duration(milliseconds: 650),
+                curve: Curves.easeInOutCubic,
               ),
             ),
             Wrap(
@@ -576,12 +583,5 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     );
   }
 
-  String _short(int value) {
-    if (value < 1000) return '$value';
-    if (value < 1000000) return '${(value / 1000).toStringAsFixed(1)}k';
-    if (value < 1000000000) {
-      return '${(value / 1000000).toStringAsFixed(1)}M';
-    }
-    return '${(value / 1000000000).toStringAsFixed(1)}G';
-  }
+  String _short(int value) => compactCount(value);
 }

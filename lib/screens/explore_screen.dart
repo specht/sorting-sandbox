@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../color_utils.dart';
+import '../format_utils.dart';
 import '../input_factory.dart';
 import '../models.dart';
 import '../worker_client.dart';
@@ -597,9 +598,5 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
-  String _short(int value) {
-    if (value < 1000) return '$value';
-    if (value < 1000000) return '${(value / 1000).toStringAsFixed(1)}k';
-    return '${(value / 1000000).toStringAsFixed(1)}M';
-  }
+  String _short(int value) => compactCount(value);
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../color_utils.dart';
+import '../format_utils.dart';
 import '../input_factory.dart';
 import '../models.dart';
 import '../worker_client.dart';
@@ -382,7 +383,9 @@ class _RaceScreenState extends State<RaceScreen> {
                                 ),
                               ),
                               Text(
-                                'R ${lane.metrics.reads}  W ${lane.metrics.writes}  C ${lane.metrics.comparisons}',
+                                'R ${compactCount(lane.metrics.reads)}  '
+                                'W ${compactCount(lane.metrics.writes)}  '
+                                'C ${compactCount(lane.metrics.comparisons)}',
                               ),
                             ],
                           ),

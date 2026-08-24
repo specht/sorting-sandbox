@@ -50,22 +50,22 @@ class ArrayView extends StatelessWidget {
                             writeIndex: writeIndex,
                             scheme: Theme.of(context).colorScheme,
                             baseColor: baseColor,
+                            variableIndices: indexVariables.values.toSet(),
                           ),
                           child: const SizedBox.expand(),
                         ),
                 ),
-                if (indexVariables.isNotEmpty)
-                  SizedBox(
-                    height: 28,
-                    child: CustomPaint(
-                      painter: _VariablePointerPainter(
-                        length: values.length,
-                        variables: indexVariables,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      child: const SizedBox.expand(),
+                SizedBox(
+                  height: 28,
+                  child: CustomPaint(
+                    painter: _VariablePointerPainter(
+                      length: values.length,
+                      variables: indexVariables,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
+                    child: const SizedBox.expand(),
                   ),
+                ),
               ],
             ),
           ),
@@ -84,6 +84,7 @@ class _ArrayPainter extends CustomPainter {
     required this.writeIndex,
     required this.scheme,
     required this.baseColor,
+    required this.variableIndices,
   });
 
   final List<int> values;
@@ -91,6 +92,7 @@ class _ArrayPainter extends CustomPainter {
   final int? writeIndex;
   final ColorScheme scheme;
   final Color? baseColor;
+  final Set<int> variableIndices;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -101,12 +103,17 @@ class _ArrayPainter extends CustomPainter {
     final slot = size.width / values.length;
     final width = max(1.0, min(slot * .72, 8.0));
     final arrayColor = baseColor ?? scheme.primary;
-    final lightColor = Color.lerp(arrayColor, Colors.white, 0.20)!;
-    final darkColor = Color.lerp(arrayColor, Colors.black, 0.10)!;
+    final lightColor = Color.lerp(arrayColor, Colors.white, 0.26)!;
+    final darkColor = Color.lerp(arrayColor, Colors.black, 0.16)!;
+    final variableOutline = Color.lerp(
+      arrayColor,
+      scheme.onSurface,
+      0.42,
+    )!;
     final arrayPaint = Paint()
       ..shader = LinearGradient(
-        begin: Alignment.bottomLeft,
-        end: Alignment.topRight,
+        begin: Alignment.bottomCenter,
+        end: Alignment.topCenter,
         colors: [darkColor, arrayColor, lightColor],
         stops: const [0, 0.58, 1],
       ).createShader(Offset.zero & size);
@@ -131,6 +138,15 @@ class _ArrayPainter extends CustomPainter {
         RRect.fromRectAndRadius(rect, const Radius.circular(2)),
         paint,
       );
+      if (variableIndices.contains(i)) {
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(rect.inflate(1), const Radius.circular(3)),
+          Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 2
+            ..color = variableOutline,
+        );
+      }
     }
   }
 
@@ -140,7 +156,8 @@ class _ArrayPainter extends CustomPainter {
       oldDelegate.readIndex != readIndex ||
       oldDelegate.writeIndex != writeIndex ||
       oldDelegate.scheme != scheme ||
-      oldDelegate.baseColor != baseColor;
+      oldDelegate.baseColor != baseColor ||
+      oldDelegate.variableIndices != variableIndices;
 }
 
 class _VariablePointerPainter extends CustomPainter {
