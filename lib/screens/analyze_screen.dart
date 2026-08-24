@@ -200,54 +200,69 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AppDropdown<InputShape>(
-              label: 'Input shape',
-              value: _shape,
-              enabled: !_running,
-              items: [
-                for (final shape in InputShape.values)
-                  DropdownMenuItem(
-                    value: shape,
-                    child: Text(inputShapeLabel(shape)),
-                  ),
-              ],
-              onChanged: (value) => setState(() => _shape = value ?? _shape),
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
+            Row(
               children: [
-                FilterChip(
-                  selected: _logX,
-                  label: const Text('Logarithmic x-axis'),
-                  onSelected: (value) => setState(() => _logX = value),
+                Expanded(
+                  child: AppDropdown<InputShape>(
+                    label: 'Input shape',
+                    value: _shape,
+                    enabled: !_running,
+                    items: [
+                      for (final shape in InputShape.values)
+                        DropdownMenuItem(
+                          value: shape,
+                          child: Text(inputShapeLabel(shape)),
+                        ),
+                    ],
+                    onChanged: (value) =>
+                        setState(() => _shape = value ?? _shape),
+                  ),
                 ),
-                FilterChip(
-                  selected: _logY,
-                  label: const Text('Logarithmic y-axis'),
-                  onSelected: (value) => setState(() => _logY = value),
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Logarithmic x-axis',
+                  child: FilterChip(
+                    visualDensity: VisualDensity.compact,
+                    selected: _logX,
+                    label: const Text('Log x'),
+                    onSelected: (value) => setState(() => _logX = value),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Tooltip(
+                  message: 'Logarithmic y-axis',
+                  child: FilterChip(
+                    visualDensity: VisualDensity.compact,
+                    selected: _logY,
+                    label: const Text('Log y'),
+                    onSelected: (value) => setState(() => _logY = value),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 6),
-            Text(
-              'Sandbox score = reads + writes + comparisons',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 10),
-            FilledButton.icon(
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(48),
-              ),
-              onPressed: _running ? () => _stop() : _run,
-              icon: Icon(_running ? Icons.stop : Icons.query_stats),
-              label: Text(_running ? 'Stop analysis' : 'Analyze all'),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Score = reads + writes + comparisons',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 40),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  onPressed: _running ? () => _stop() : _run,
+                  icon: Icon(_running ? Icons.stop : Icons.query_stats),
+                  label: Text(_running ? 'Stop' : 'Analyze all'),
+                ),
+              ],
             ),
           ],
         ),

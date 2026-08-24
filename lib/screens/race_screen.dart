@@ -39,7 +39,7 @@ class _RaceScreenState extends State<RaceScreen> {
   final List<_RaceLane> _lanes = [];
   bool _running = false;
   int _n = 48;
-  int _speed = 3;
+  int _speed = 12;
   InputShape _shape = InputShape.random;
   int _seed = 100;
   bool _catalogUpdatePending = false;
@@ -61,8 +61,8 @@ class _RaceScreenState extends State<RaceScreen> {
     768,
     1024,
   ];
-  static const _budgets = [1, 2, 5, 20, 100, 1000];
-  static const _delays = [220, 150, 90, 50, 20, 0];
+  static const _budgets = [1, 1, 1, 2, 2, 3, 3, 4, 5, 7, 10, 14, 20, 30, 45, 67, 100, 178, 316, 562, 1000];
+  static const _delays = [220, 202, 185, 168, 150, 135, 120, 105, 90, 80, 70, 60, 50, 42, 35, 28, 20, 15, 10, 5, 0];
 
   @override
   void initState() {
@@ -217,6 +217,56 @@ class _RaceScreenState extends State<RaceScreen> {
     }
   }
 
+  Widget _compactRaceControls(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: Text(
+            '${inputShapeLabel(_shape)} · n=$_n',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+        ),
+        const SizedBox(width: 6),
+        const Icon(Icons.speed, size: 18),
+        Expanded(
+          flex: 3,
+          child: SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 3,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+            ),
+            child: Slider(
+              value: _speed.toDouble(),
+              min: 0,
+              max: 20,
+              divisions: 20,
+              label: '${_speed * 5}%',
+              onChanged: (value) => setState(() => _speed = value.round()),
+            ),
+          ),
+        ),
+        SizedBox(
+          width: 42,
+          child: Text(
+            '${_speed * 5}%',
+            textAlign: TextAlign.end,
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+        ),
+        const SizedBox(width: 6),
+        IconButton.filled(
+          onPressed: () => _stop(),
+          tooltip: 'Stop race',
+          icon: const Icon(Icons.stop),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.catalog.algorithms.length < 2) {
@@ -229,10 +279,16 @@ class _RaceScreenState extends State<RaceScreen> {
       child: Column(
         children: [
           Card(
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                children: [
+            child: AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeInOut,
+              alignment: Alignment.topCenter,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: _running
+                    ? _compactRaceControls(context)
+                    : Column(
+                        children: [
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
@@ -294,14 +350,14 @@ class _RaceScreenState extends State<RaceScreen> {
                   ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [const Text('Speed'), Text('${_speed + 1} / 6')],
+                    children: [const Text('Speed'), Text('${_speed * 5}%')],
                   ),
                   Slider(
                     value: _speed.toDouble(),
                     min: 0,
-                    max: 5,
-                    divisions: 5,
-                    label: 'speed ${_speed + 1}',
+                    max: 20,
+                    divisions: 20,
+                    label: '${_speed * 5}%',
                     onChanged: (v) => setState(() => _speed = v.round()),
                   ),
                   const SizedBox(height: 4),
@@ -311,16 +367,15 @@ class _RaceScreenState extends State<RaceScreen> {
                       style: FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(48),
                       ),
-                      onPressed: _running
-                          ? () => _stop()
-                          : (_selected.length >= 2 ? _start : null),
-                      icon: Icon(_running ? Icons.stop : Icons.sports_score),
-                      label: Text(_running ? 'Stop race' : 'Race'),
+                      onPressed: _selected.length >= 2 ? _start : null,
+                      icon: const Icon(Icons.sports_score),
+                      label: const Text('Race'),
                     ),
                   ),
                 ],
               ),
             ),
+          ),
           ),
           const SizedBox(height: 8),
           Expanded(

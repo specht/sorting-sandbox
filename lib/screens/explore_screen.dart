@@ -35,7 +35,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
   Map<String, dynamic> _locals = const {};
   int _line = 0;
   int _n = 48;
-  int _speed = 2;
+  int _speed = 8;
   InputShape _shape = InputShape.random;
   bool _running = false;
   bool _paused = false;
@@ -74,8 +74,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
     3072,
     4096,
   ];
-  static const _budgets = [1, 2, 5, 20, 100, 1000];
-  static const _delays = [220, 150, 90, 50, 20, 0];
+  // Twenty-one speed levels preserve the old six anchor speeds exactly,
+  // with geometric interpolation for execution budget and linear
+  // interpolation for frame delay between them.
+  static const _budgets = [1, 1, 1, 2, 2, 3, 3, 4, 5, 7, 10, 14, 20, 30, 45, 67, 100, 178, 316, 562, 1000];
+  static const _delays = [220, 202, 185, 168, 150, 135, 120, 105, 90, 80, 70, 60, 50, 42, 35, 28, 20, 15, 10, 5, 0];
 
   @override
   void initState() {
@@ -801,12 +804,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
               child: Slider(
                 value: _speed.toDouble(),
                 min: 0,
-                max: 5,
-                divisions: 5,
+                max: 20,
+                divisions: 20,
+                label: '${_speed * 5}%',
                 onChanged: (value) => setState(() => _speed = value.round()),
               ),
             ),
-            const SizedBox(width: 52, child: Icon(Icons.speed)),
+            SizedBox(
+              width: 52,
+              child: Text('${_speed * 5}%', textAlign: TextAlign.end),
+            ),
           ],
         ),
         Row(
