@@ -20,6 +20,23 @@ if [[ ! -d "$ALGORITHMS" ]]; then
   exit 66
 fi
 
+tmp=""
+stop_gradle() {
+  if [[ -x android/gradlew ]]; then
+    ./android/gradlew --stop >/dev/null 2>&1 || true
+  fi
+}
+cleanup() {
+  stop_gradle
+  if [[ -n "$tmp" ]]; then
+    rm -rf "$tmp"
+  fi
+}
+trap cleanup EXIT
+
+echo "==> Stopping stale Gradle daemons"
+stop_gradle
+
 echo "==> Application dependencies"
 flutter pub get
 
@@ -31,7 +48,6 @@ dart run tool/build_algorithms.dart \
 
 echo "==> Generating Android host for this Flutter SDK"
 tmp="$(mktemp -d)"
-trap 'rm -rf "$tmp"' EXIT
 flutter create \
   --no-pub \
   --platforms=android \

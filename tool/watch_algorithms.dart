@@ -87,15 +87,30 @@ Future<void> main(List<String> args) async {
   });
 
   // Keep the command alive until it receives a signal from the run script.
+  // The signal subscriptions themselves own native receive ports, so they must
+  // be cancelled as part of shutdown. Otherwise main() returns but the Dart VM
+  // stays alive as an orphaned watcher process.
   final done = Completer<void>();
-  void finish(ProcessSignal signal) {
+  final signalSubscriptions = <StreamSubscription<ProcessSignal>>[];
+  var finishing = false;
+
+  Future<void> finish() async {
+    if (finishing) return;
+    finishing = true;
     pollTimer.cancel();
+    for (final subscription in signalSubscriptions) {
+      await subscription.cancel();
+    }
     if (!done.isCompleted) done.complete();
   }
 
   if (!Platform.isWindows) {
-    ProcessSignal.sigint.watch().listen(finish);
-    ProcessSignal.sigterm.watch().listen(finish);
+    signalSubscriptions.add(
+      ProcessSignal.sigint.watch().listen((_) => unawaited(finish())),
+    );
+    signalSubscriptions.add(
+      ProcessSignal.sigterm.watch().listen((_) => unawaited(finish())),
+    );
   }
   await done.future;
 }

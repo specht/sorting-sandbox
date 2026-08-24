@@ -64,15 +64,29 @@ fi
 
 cleanup() {
   local pid
-  for pid in "${SERVER_PID:-}" "${WATCH_PID:-}"; do
+  local attempt
+  local pids=("${SERVER_PID:-}" "${WATCH_PID:-}")
+
+  # Ask both children to stop first so their graceful shutdown can happen in
+  # parallel. A wedged child must not keep ./run alive forever or become an
+  # orphan when the shell is eventually killed.
+  for pid in "${pids[@]}"; do
     if [[ -n "$pid" ]]; then
       kill "$pid" 2>/dev/null || true
     fi
   done
-  for pid in "${SERVER_PID:-}" "${WATCH_PID:-}"; do
-    if [[ -n "$pid" ]]; then
-      wait "$pid" 2>/dev/null || true
+
+  for pid in "${pids[@]}"; do
+    [[ -n "$pid" ]] || continue
+    for attempt in {1..20}; do
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      echo "Forcing child process $pid to stop..." >&2
+      kill -KILL "$pid" 2>/dev/null || true
     fi
+    wait "$pid" 2>/dev/null || true
   done
 }
 
