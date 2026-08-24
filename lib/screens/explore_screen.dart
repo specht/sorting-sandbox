@@ -228,18 +228,28 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
     _historyCursor = index;
 
-    // Keep a bounded cache around the checkpoint the user is looking at.
-    // The furthest checkpoint is tracked separately, so cached future frames
-    // may be discarded without shortening the timeline.
+    // Keep a sparse cache distributed across the whole timeline. Exact
+    // checkpoints are still reconstructed by replay, while these samples make
+    // dragging the timeline feel immediate even for very large runs.
     while (_history.length > _historyLimit) {
-      final left = _historyCursor;
-      final right = _history.length - 1 - _historyCursor;
-      if (left > right) {
-        _history.removeAt(0);
-        _historyCursor--;
-      } else {
-        _history.removeLast();
+      var removeIndex = -1;
+      int? smallestSpan;
+      for (var i = 1; i < _history.length - 1; i++) {
+        if (i == _historyCursor) continue;
+        final span = _history[i + 1].checkpoint - _history[i - 1].checkpoint;
+        if (smallestSpan == null || span < smallestSpan) {
+          smallestSpan = span;
+          removeIndex = i;
+        }
       }
+
+      // Normally an interior sample can be thinned. The fallback only matters
+      // for very small limits and still protects the frame being displayed.
+      if (removeIndex < 0) {
+        removeIndex = _historyCursor == 0 ? _history.length - 1 : 0;
+      }
+      _history.removeAt(removeIndex);
+      if (removeIndex < _historyCursor) _historyCursor--;
     }
   }
 
@@ -454,6 +464,43 @@ class _ExploreScreenState extends State<ExploreScreen> {
     // Fast-forward a fresh disposable worker to the exact checkpoint. This
     // keeps high-speed animation sparse while making debug stepping exact.
     unawaited(_start(paused: true, replayCheckpoint: checkpoint));
+  }
+
+  int _nearestCachedIndex(int checkpoint) {
+    if (_history.isEmpty) return -1;
+    var low = 0;
+    var high = _history.length - 1;
+    while (low <= high) {
+      final middle = (low + high) >> 1;
+      final value = _history[middle].checkpoint;
+      if (value == checkpoint) return middle;
+      if (value < checkpoint) {
+        low = middle + 1;
+      } else {
+        high = middle - 1;
+      }
+    }
+    if (low <= 0) return 0;
+    if (low >= _history.length) return _history.length - 1;
+    final before = _history[low - 1].checkpoint;
+    final after = _history[low].checkpoint;
+    return checkpoint - before <= after - checkpoint ? low - 1 : low;
+  }
+
+  void _previewScrub(int checkpoint) {
+    if (!_canBrowseHistory || _history.isEmpty) return;
+    final target = checkpoint.clamp(0, _latestCheckpoint).toInt();
+    final cached = _nearestCachedIndex(target);
+    if (cached < 0) return;
+    final frame = _history[cached];
+    setState(() {
+      _scrubTarget = target;
+      if (_running) _paused = true;
+      _historyCursor = cached;
+      _applyFrameState(frame);
+    });
+    _watchdog?.cancel();
+    _watchdog = null;
   }
 
   void _showHistoryAt(int index) {
@@ -797,7 +844,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     : null,
                 label: hasCheckpoint ? 'step $target' : 'start',
                 onChanged: canScrub
-                    ? (value) => setState(() => _scrubTarget = value.round())
+                    ? (value) => _previewScrub(value.round())
                     : null,
                 onChangeEnd: canScrub
                     ? (value) {
