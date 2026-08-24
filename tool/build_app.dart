@@ -47,7 +47,7 @@ Future<void> main(List<String> args) async {
   stdout.writeln('Flutter application changed — building web release…');
   final process = await Process.start(
     'flutter',
-    ['build', 'web', '--release', '--no-wasm-dry-run', '--dart2js-optimization O1'],
+    ['build', 'web', '--release', '--no-wasm-dry-run', '--dart2js-optimization', 'O1'],
     workingDirectory: root.path,
     mode: ProcessStartMode.inheritStdio,
   );
