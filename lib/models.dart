@@ -106,6 +106,7 @@ class VisualFrame {
     required this.origins,
     required this.metrics,
     required this.line,
+    required this.checkpoint,
     required this.locals,
     required this.read,
     required this.write,
@@ -129,6 +130,7 @@ class VisualFrame {
       (json['metrics'] as Map).cast<String, dynamic>(),
     ),
     line: (json['line'] as num?)?.toInt() ?? 0,
+    checkpoint: (json['checkpoint'] as num?)?.toInt() ?? -1,
     locals: (json['locals'] as Map?)?.cast<String, dynamic>() ?? const {},
     read: MarkerData.fromJson(json['read']),
     write: MarkerData.fromJson(json['write']),
@@ -140,6 +142,7 @@ class VisualFrame {
   final List<int> origins;
   final MetricsData metrics;
   final int line;
+  final int checkpoint;
   final Map<String, dynamic> locals;
   final MarkerData read;
   final MarkerData write;

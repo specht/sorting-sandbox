@@ -103,6 +103,7 @@ class CheckpointSession {
   int _budget = 0;
   Completer<void>? _waiting;
   int currentLine = 0;
+  int checkpointIndex = -1;
   Map<String, Object?> currentLocals = const {};
   bool done = false;
 
@@ -122,6 +123,7 @@ class CheckpointSession {
   }
 
   Future<void> checkpoint(int line, Map<String, Object?> locals) async {
+    checkpointIndex++;
     currentLine = line;
     currentLocals = <String, Object?>{
       for (final entry in locals.entries) entry.key: _debugValue(entry.value),
@@ -152,6 +154,7 @@ class CheckpointSession {
       'type': 'frame',
       'done': done,
       'line': currentLine,
+      'checkpoint': checkpointIndex,
       'locals': currentLocals,
       'numbers': list.map((e) => e.key).toList(),
       'scratch': scratch.map((e) => e.key).toList(),

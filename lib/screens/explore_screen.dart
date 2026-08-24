@@ -45,6 +45,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
   int _seed = 42;
   bool _catalogUpdatePending = false;
   bool _showMemoryAccess = false;
+  final List<VisualFrame> _history = [];
+  int _historyCursor = -1;
+  bool _replaying = false;
+  int? _replayTarget;
+  bool _continueAfterReplay = false;
 
   // Geometric-ish steps keep small teaching examples easy to select while
   // still allowing genuinely large inputs for fast algorithms.
@@ -111,6 +116,59 @@ class _ExploreScreenState extends State<ExploreScreen> {
     return algorithms.first;
   }
 
+  bool get _viewingHistory =>
+      _historyCursor >= 0 && _historyCursor < _history.length - 1;
+
+  bool get _canBrowseHistory =>
+      _history.length > 1 &&
+      (!_running || (_atCheckpoint && !_replaying));
+
+  bool get _canStepBack => _canBrowseHistory && _historyCursor > 0;
+
+  bool get _canStepForward {
+    if (_history.isEmpty) return !_running;
+    if (_historyCursor < _history.length - 1) return _canBrowseHistory;
+    return _running && _paused && _atCheckpoint && !_replaying;
+  }
+
+  int get _historyLimit {
+    final cells = _numbers.isEmpty ? 1 : _numbers.length * 3;
+    final bySize = 300000 ~/ cells;
+    if (bySize < 24) return 24;
+    if (bySize > 300) return 300;
+    return bySize;
+  }
+
+  void _clearHistoryState() {
+    _history.clear();
+    _historyCursor = -1;
+    _replaying = false;
+    _replayTarget = null;
+    _continueAfterReplay = false;
+  }
+
+  void _applyFrameState(VisualFrame frame) {
+    _numbers = frame.numbers;
+    _scratch = frame.scratch;
+    _metrics = frame.metrics;
+    _read = frame.read;
+    _write = frame.write;
+    _locals = frame.locals;
+    _line = frame.line;
+  }
+
+  void _recordFrameState(VisualFrame frame) {
+    if (_history.isNotEmpty &&
+        _history.last.checkpoint == frame.checkpoint) {
+      _history[_history.length - 1] = frame;
+    } else {
+      _history.add(frame);
+    }
+    final overflow = _history.length - _historyLimit;
+    if (overflow > 0) _history.removeRange(0, overflow);
+    _historyCursor = _history.length - 1;
+  }
+
   void _restoreInputState() {
     _numbers = List<int>.from(_input);
     _scratch = List<int>.filled(_input.length, 0);
@@ -120,6 +178,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _locals = const {};
     _line = 0;
     _error = null;
+    _clearHistoryState();
   }
 
   void _restoreInput() => setState(_restoreInputState);
@@ -130,10 +189,19 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _restoreInput();
   }
 
-  Future<void> _start({bool paused = false}) async {
+  Future<void> _start({
+    bool paused = false,
+    int? replayCheckpoint,
+    bool continueAfterReplay = false,
+  }) async {
     final algorithm = _algorithm;
-    if (algorithm == null || _running) return;
+    if (algorithm == null) return;
     _stop();
+
+    if (replayCheckpoint == null) {
+      _history.clear();
+      _historyCursor = -1;
+    }
 
     final worker = AlgorithmWorker(workerPath: widget.catalog.workerPath);
     _worker = worker;
@@ -147,14 +215,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
       if (type == 'frame') {
         final frame = VisualFrame.fromJson(message);
         if (!mounted) return;
+        if (_replaying) {
+          _handleReplayFrame(frame, requestId);
+          return;
+        }
         setState(() {
-          _numbers = frame.numbers;
-          _scratch = frame.scratch;
-          _metrics = frame.metrics;
-          _read = frame.read;
-          _write = frame.write;
-          _locals = frame.locals;
-          _line = frame.line;
+          _applyFrameState(frame);
+          _recordFrameState(frame);
           _atCheckpoint = true;
         });
         if (frame.done) {
@@ -174,25 +241,65 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
     setState(() {
       _running = true;
-      _paused = paused;
+      _paused = paused || replayCheckpoint != null;
       _atCheckpoint = false;
       _error = null;
+      _replaying = replayCheckpoint != null;
+      _replayTarget = replayCheckpoint;
+      _continueAfterReplay = continueAfterReplay;
     });
 
     worker.send({
       'type': 'visualStart',
       'requestId': requestId,
       'algorithmId': algorithm.id,
-      'values': _numbers,
+      'values': replayCheckpoint == null ? _numbers : _input,
     });
 
     _armWatchdog();
   }
 
+  void _handleReplayFrame(VisualFrame frame, String requestId) {
+    final target = _replayTarget;
+    if (target == null) return;
+
+    if (frame.checkpoint < target) {
+      _sendAdvance(target - frame.checkpoint, requestId: requestId);
+      return;
+    }
+    if (frame.checkpoint > target) {
+      _fail(
+        'Could not replay checkpoint $target '
+        '(worker reached ${frame.checkpoint}).',
+      );
+      return;
+    }
+
+    final continueRunning = _continueAfterReplay && !frame.done;
+    setState(() {
+      _applyFrameState(frame);
+      _recordFrameState(frame);
+      _replaying = false;
+      _replayTarget = null;
+      _continueAfterReplay = false;
+      _paused = !continueRunning;
+      _atCheckpoint = true;
+    });
+
+    if (continueRunning) {
+      _scheduleAdvance(requestId);
+    } else {
+      _watchdog?.cancel();
+      _watchdog = null;
+    }
+  }
+
   void _armWatchdog() {
     if (!_running || _worker == null || _watchdog != null) return;
     _watchdog = _worker!.watchdog(
-      timeout: const Duration(seconds: 2),
+      timeout: _replaying
+          ? const Duration(seconds: 6)
+          : const Duration(seconds: 2),
       onTimeout: () =>
           _fail('No checkpoint reached. The algorithm was stopped.'),
     );
@@ -216,10 +323,15 @@ class _ExploreScreenState extends State<ExploreScreen> {
   }
 
   void _togglePause() {
+    if (_viewingHistory) {
+      unawaited(_resumeFromHistory(continueRunning: true));
+      return;
+    }
     if (!_running) {
       _start();
       return;
     }
+    if (_replaying) return;
     setState(() => _paused = !_paused);
     if (_paused) {
       if (_atCheckpoint) {
@@ -231,13 +343,55 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
-  void _step() {
-    if (!_running) {
-      _start(paused: true);
+  void _stepBack() {
+    if (!_canStepBack) return;
+    _showHistoryAt(_historyCursor - 1);
+  }
+
+  void _stepForward() {
+    if (_history.isEmpty) {
+      if (!_running) _start(paused: true);
       return;
     }
-    if (!_paused || !_atCheckpoint) return;
-    _sendAdvance(1);
+    if (_historyCursor < _history.length - 1) {
+      if (_canBrowseHistory) _showHistoryAt(_historyCursor + 1);
+      return;
+    }
+    if (_running && _paused && _atCheckpoint && !_replaying) {
+      _sendAdvance(1);
+    }
+  }
+
+  void _showHistoryAt(int index) {
+    if (index < 0 || index >= _history.length) return;
+    if (_running && (!_atCheckpoint || _replaying)) return;
+    final frame = _history[index];
+    setState(() {
+      if (_running) _paused = true;
+      _historyCursor = index;
+      _applyFrameState(frame);
+    });
+    _watchdog?.cancel();
+    _watchdog = null;
+  }
+
+  Future<void> _resumeFromHistory({required bool continueRunning}) async {
+    if (_historyCursor < 0 || _historyCursor >= _history.length) return;
+    final target = _history[_historyCursor].checkpoint;
+    if (target < 0) return;
+
+    setState(() {
+      if (_historyCursor < _history.length - 1) {
+        _history.removeRange(_historyCursor + 1, _history.length);
+      }
+      _historyCursor = _history.length - 1;
+    });
+
+    await _start(
+      paused: true,
+      replayCheckpoint: target,
+      continueAfterReplay: continueRunning,
+    );
   }
 
   void _finish() {
@@ -249,6 +403,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _atCheckpoint = false;
       _read = const MarkerData();
       _write = const MarkerData();
+      _replaying = false;
+      _replayTarget = null;
+      _continueAfterReplay = false;
       if (_catalogUpdatePending) {
         _algorithm = _mappedAlgorithm();
         _catalogUpdatePending = false;
@@ -269,6 +426,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
       _error = message;
       _read = const MarkerData();
       _write = const MarkerData();
+      _replaying = false;
+      _replayTarget = null;
+      _continueAfterReplay = false;
       if (_catalogUpdatePending) {
         _algorithm = _mappedAlgorithm();
         _catalogUpdatePending = false;
@@ -288,6 +448,9 @@ class _ExploreScreenState extends State<ExploreScreen> {
     _worker = null;
     _requestId = null;
     _atCheckpoint = false;
+    _replaying = false;
+    _replayTarget = null;
+    _continueAfterReplay = false;
     if (updateState && mounted) {
       setState(() {
         _running = false;
@@ -306,7 +469,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
       marker.list == list ? marker.index : null;
 
   Map<String, int> _indexVariables() {
-    if (!_running) return const {};
+    if (!_running && !_viewingHistory) return const {};
     final result = <String, int>{};
     for (final entry in _locals.entries) {
       final value = entry.value;
@@ -390,12 +553,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
           );
         }
         return Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 2),
           child: Column(
             children: [
               Expanded(child: visual),
-              const SizedBox(height: 8),
-              SizedBox(height: 130, child: _localsPanel(context)),
+              const SizedBox(height: 4),
+              SizedBox(height: 84, child: _localsPanel(context)),
             ],
           ),
         );
@@ -504,6 +667,58 @@ class _ExploreScreenState extends State<ExploreScreen> {
     );
   }
 
+  Widget _historyScrubber(BuildContext context) {
+    if (_history.length < 2 || _historyCursor < 0) {
+      return const SizedBox.shrink();
+    }
+    final cursor = _historyCursor.clamp(0, _history.length - 1).toInt();
+    final frame = _history[cursor];
+    return SizedBox(
+      height: 30,
+      child: Row(
+        children: [
+          Tooltip(
+            message: _viewingHistory
+                ? 'Viewing an earlier checkpoint. Run resumes from here.'
+                : 'Execution history',
+            child: Icon(
+              _replaying ? Icons.sync : Icons.history,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 2,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+              ),
+              child: Slider(
+                value: cursor.toDouble(),
+                min: 0,
+                max: (_history.length - 1).toDouble(),
+                divisions: _history.length - 1,
+                label: 'step ${frame.checkpoint}',
+                onChanged: _canBrowseHistory
+                    ? (value) => _showHistoryAt(value.round())
+                    : null,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 72,
+            child: Text(
+              'step ${frame.checkpoint}',
+              textAlign: TextAlign.end,
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _controls(BuildContext context) {
     return Column(
       children: [
@@ -551,15 +766,20 @@ class _ExploreScreenState extends State<ExploreScreen> {
               icon: const Icon(Icons.shuffle),
             ),
             IconButton(
-              onPressed: (!_running || (_paused && _atCheckpoint))
-                  ? _step
-                  : null,
-              tooltip: 'Single step',
+              onPressed: _canStepBack ? _stepBack : null,
+              tooltip: 'Previous checkpoint',
+              icon: const Icon(Icons.skip_previous),
+            ),
+            IconButton(
+              onPressed: _canStepForward ? _stepForward : null,
+              tooltip: 'Next checkpoint',
               icon: const Icon(Icons.skip_next),
             ),
             IconButton(
-              onPressed: _togglePause,
-              tooltip: !_running ? 'Run' : (_paused ? 'Continue' : 'Pause'),
+              onPressed: _replaying ? null : _togglePause,
+              tooltip: _viewingHistory
+                  ? 'Continue from this checkpoint'
+                  : (!_running ? 'Run' : (_paused ? 'Continue' : 'Pause')),
               icon: Icon(
                 !_running
                     ? Icons.play_arrow
@@ -573,6 +793,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             ),
           ],
         ),
+        if (_history.length > 1) _historyScrubber(context),
         Row(
           children: [
             const SizedBox(width: 52, child: Text('Speed')),

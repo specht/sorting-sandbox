@@ -47,4 +47,25 @@ void main() {
     expect(unstable.sorted, isTrue);
     expect(unstable.stable, isFalse);
   });
+
+  test('visual checkpoints carry deterministic sequence numbers', () async {
+    final frames = <Map<String, Object?>>[];
+    final session = CheckpointSession(emitFrame: frames.add);
+
+    final first = session.checkpoint(10, {'i': 0});
+    await Future<void>.delayed(Duration.zero);
+    expect(frames.single['checkpoint'], 0);
+    session.addBudget(1);
+    await first;
+
+    final second = session.checkpoint(11, {'i': 1});
+    await Future<void>.delayed(Duration.zero);
+    expect(frames.last['checkpoint'], 1);
+    session.addBudget(1);
+    await second;
+
+    session.finish();
+    expect(frames.last['checkpoint'], 1);
+    expect(frames.last['done'], isTrue);
+  });
 }
