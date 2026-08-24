@@ -22,3 +22,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: 0xProto Nerd Font Mono
+      fonts:
+        - asset: assets/fonts/0xProtoNerdFontMono-Regular.ttf

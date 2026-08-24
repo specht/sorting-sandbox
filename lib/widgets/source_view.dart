@@ -3,10 +3,9 @@ import 'package:flutter/material.dart';
 class SourceView extends StatelessWidget {
   const SourceView({super.key, required this.source, required this.line});
 
-  // CanvasKit cannot reliably use host-installed fonts. Keep the generic
-  // family here as the fallback; a bundled classroom font can override this
-  // family later without changing the source-view layout.
-  static const _monoFamily = 'monospace';
+  // Bundle the classroom code font so CanvasKit renders the same on every
+  // machine, independent of locally installed fonts.
+  static const _monoFamily = '0xProto Nerd Font Mono';
 
   final String source;
   final int line;
@@ -46,7 +45,7 @@ class SourceView extends StatelessWidget {
                     textAlign: TextAlign.right,
                     style: TextStyle(
                       fontFamily: _monoFamily,
-                      fontSize: 13.5,
+                      fontSize: 14.5,
                       color: scheme.outline,
                     ),
                   ),
@@ -57,8 +56,8 @@ class SourceView extends StatelessWidget {
                     lines[index],
                     style: const TextStyle(
                       fontFamily: _monoFamily,
-                      fontSize: 15,
-                      height: 1.42,
+                      fontSize: 16.5,
+                      height: 1.40,
                     ),
                   ),
                 ),
