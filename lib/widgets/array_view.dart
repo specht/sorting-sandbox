@@ -60,15 +60,15 @@ class ArrayView extends StatelessWidget {
                 if (reservePointerGutter || indexVariables.isNotEmpty)
                   SizedBox(
                     height: 46,
-                  child: CustomPaint(
-                    painter: _VariablePointerPainter(
-                      length: values.length,
-                      variables: indexVariables,
-                      color: Theme.of(context).colorScheme.primary,
+                    child: CustomPaint(
+                      painter: _VariablePointerPainter(
+                        length: values.length,
+                        variables: indexVariables,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      child: const SizedBox.expand(),
                     ),
-                    child: const SizedBox.expand(),
                   ),
-                ),
               ],
             ),
           ),
@@ -214,10 +214,7 @@ class _VariablePointerPainter extends CustomPainter {
         maxLines: 1,
       )..layout(maxWidth: size.width);
       labels.add(
-        _PointerLabel(
-          x: (entry.key + 0.5) * slot,
-          textPainter: textPainter,
-        ),
+        _PointerLabel(x: (entry.key + 0.5) * slot, textPainter: textPainter),
       );
     }
     labels.sort((a, b) => a.x.compareTo(b.x));
@@ -229,10 +226,7 @@ class _VariablePointerPainter extends CustomPainter {
     const laneCount = 3;
     const laneGap = 4.0;
     const laneHeight = 11.0;
-    final laneRight = List<double>.filled(
-      laneCount,
-      double.negativeInfinity,
-    );
+    final laneRight = List<double>.filled(laneCount, double.negativeInfinity);
 
     for (final label in labels) {
       final maxLeft = max(0.0, size.width - label.textPainter.width);

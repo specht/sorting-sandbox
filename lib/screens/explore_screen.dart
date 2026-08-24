@@ -468,19 +468,24 @@ class _ExploreScreenState extends State<ExploreScreen> {
                         spacing: 8,
                         runSpacing: 6,
                         children: [
-                          for (final entry in (_locals.entries.toList()
-                            ..sort((a, b) => a.key.compareTo(b.key))))
+                          for (final entry
+                              in (_locals.entries.toList()
+                                ..sort((a, b) => a.key.compareTo(b.key))))
                             SizedBox(
                               width: 116,
                               child: Chip(
-                                labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                                labelPadding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
                                 label: Text(
                                   '${entry.key} = ${entry.value}',
                                   maxLines: 1,
                                   overflow: TextOverflow.fade,
                                   softWrap: false,
                                   textAlign: TextAlign.center,
-                                  style: const TextStyle(fontFamily: 'monospace'),
+                                  style: const TextStyle(
+                                    fontFamily: 'monospace',
+                                  ),
                                 ),
                               ),
                             ),
