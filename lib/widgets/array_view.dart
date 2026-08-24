@@ -11,6 +11,7 @@ class ArrayView extends StatelessWidget {
     this.writeIndex,
     this.emptyHint,
     this.baseColor,
+    this.reservePointerGutter = true,
     this.indexVariables = const {},
   });
 
@@ -20,6 +21,7 @@ class ArrayView extends StatelessWidget {
   final int? writeIndex;
   final String? emptyHint;
   final Color? baseColor;
+  final bool reservePointerGutter;
   final Map<String, int> indexVariables;
 
   @override
@@ -55,8 +57,9 @@ class ArrayView extends StatelessWidget {
                           child: const SizedBox.expand(),
                         ),
                 ),
-                SizedBox(
-                  height: 28,
+                if (reservePointerGutter || indexVariables.isNotEmpty)
+                  SizedBox(
+                    height: 46,
                   child: CustomPaint(
                     painter: _VariablePointerPainter(
                       length: values.length,
@@ -115,7 +118,7 @@ class _ArrayPainter extends CustomPainter {
       // Presentation-only scaling: a gentle concave curve gives a sorted
       // array the characteristic visual sweep of the original sandbox while
       // preserving the ordering of all values.
-      final displayValue = pow(normalized, 0.68).toDouble();
+      final displayValue = pow(normalized, 0.52).toDouble();
       final h = max(1.0, displayValue * (size.height - 8));
       final x = i * slot + (slot - width) / 2;
       final rect = Rect.fromLTWH(x, size.height - h, width, h);
@@ -187,39 +190,93 @@ class _VariablePointerPainter extends CustomPainter {
     }
 
     final slot = size.width / length;
-    final paint = Paint()
+    final pointerPaint = Paint()
       ..color = color
-      ..strokeWidth = 1.5
+      ..strokeWidth = 1.25
       ..style = PaintingStyle.fill;
+    final connectorPaint = Paint()
+      ..color = color.withValues(alpha: 0.55)
+      ..strokeWidth = 1;
 
+    final labels = <_PointerLabel>[];
     for (final entry in byIndex.entries) {
-      final x = (entry.key + 0.5) * slot;
-      final arrow = Path()
-        ..moveTo(x, 0)
-        ..lineTo(x - 4, 6)
-        ..lineTo(x + 4, 6)
-        ..close();
-      canvas.drawPath(arrow, paint);
-      canvas.drawLine(Offset(x, 5), Offset(x, 10), paint);
-
-      final label = entry.value.join(', ');
+      final names = List<String>.from(entry.value)..sort();
       final textPainter = TextPainter(
         text: TextSpan(
-          text: label,
+          text: names.join(', '),
           style: TextStyle(
             color: color,
-            fontSize: 11,
+            fontSize: 10,
             fontWeight: FontWeight.w600,
           ),
         ),
         textDirection: TextDirection.ltr,
         maxLines: 1,
       )..layout(maxWidth: size.width);
+      labels.add(
+        _PointerLabel(
+          x: (entry.key + 0.5) * slot,
+          textPainter: textPainter,
+        ),
+      );
+    }
+    labels.sort((a, b) => a.x.compareTo(b.x));
 
-      final left = (x - textPainter.width / 2)
-          .clamp(0.0, max(0.0, size.width - textPainter.width))
+    // Put nearby labels on separate fixed lanes. This keeps names such as
+    // left/middle/right readable even when their indices are close together.
+    // The gutter itself has a fixed height, so lane changes never resize the
+    // array visualization.
+    const laneCount = 3;
+    const laneGap = 4.0;
+    const laneHeight = 11.0;
+    final laneRight = List<double>.filled(
+      laneCount,
+      double.negativeInfinity,
+    );
+
+    for (final label in labels) {
+      final maxLeft = max(0.0, size.width - label.textPainter.width);
+      final preferredLeft = (label.x - label.textPainter.width / 2)
+          .clamp(0.0, maxLeft)
           .toDouble();
-      textPainter.paint(canvas, Offset(left, 11));
+
+      var lane = 0;
+      var foundLane = false;
+      for (var candidate = 0; candidate < laneCount; candidate++) {
+        if (preferredLeft >= laneRight[candidate] + laneGap) {
+          lane = candidate;
+          foundLane = true;
+          break;
+        }
+      }
+      if (!foundLane) {
+        for (var candidate = 1; candidate < laneCount; candidate++) {
+          if (laneRight[candidate] < laneRight[lane]) lane = candidate;
+        }
+      }
+
+      var left = max(preferredLeft, laneRight[lane] + laneGap);
+      left = left.clamp(0.0, maxLeft).toDouble();
+      laneRight[lane] = left + label.textPainter.width;
+
+      final arrow = Path()
+        ..moveTo(label.x, 0)
+        ..lineTo(label.x - 3.5, 5)
+        ..lineTo(label.x + 3.5, 5)
+        ..close();
+      canvas.drawPath(arrow, pointerPaint);
+
+      final textY = 10 + lane * laneHeight;
+      final labelCenter = left + label.textPainter.width / 2;
+      canvas.drawLine(Offset(label.x, 5), Offset(label.x, 8), connectorPaint);
+      if ((labelCenter - label.x).abs() > 1) {
+        canvas.drawLine(
+          Offset(label.x, 8),
+          Offset(labelCenter, textY - 1),
+          connectorPaint,
+        );
+      }
+      label.textPainter.paint(canvas, Offset(left, textY));
     }
   }
 
@@ -228,4 +285,11 @@ class _VariablePointerPainter extends CustomPainter {
       oldDelegate.length != length ||
       oldDelegate.variables != variables ||
       oldDelegate.color != color;
+}
+
+class _PointerLabel {
+  const _PointerLabel({required this.x, required this.textPainter});
+
+  final double x;
+  final TextPainter textPainter;
 }

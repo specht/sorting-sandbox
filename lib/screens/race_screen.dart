@@ -361,6 +361,7 @@ class _RaceScreenState extends State<RaceScreen> {
                                 child: ArrayView(
                                   values: lane.numbers,
                                   label: 'List',
+                                  reservePointerGutter: false,
                                   baseColor: parseHexColor(
                                     lane.algorithm.color,
                                   ),
@@ -371,6 +372,7 @@ class _RaceScreenState extends State<RaceScreen> {
                                 child: ArrayView(
                                   values: lane.scratch,
                                   label: 'Scratch',
+                                  reservePointerGutter: false,
                                   baseColor: Colors.grey,
                                 ),
                               ),

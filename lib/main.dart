@@ -26,9 +26,9 @@ class SortingSandboxApp extends StatelessWidget {
         colorScheme: colorScheme,
         scaffoldBackgroundColor: colorScheme.surface,
         appBarTheme: AppBarTheme(
-          backgroundColor: colorScheme.surface,
-          foregroundColor: colorScheme.onSurface,
-          surfaceTintColor: colorScheme.surfaceTint,
+          backgroundColor: Colors.green.shade800,
+          foregroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
           scrolledUnderElevation: 2,
         ),
         navigationBarTheme: NavigationBarThemeData(
