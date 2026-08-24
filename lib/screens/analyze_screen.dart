@@ -443,7 +443,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
       final bValid = br != null && br.correct && br.benchmarks.isNotEmpty;
       if (aValid != bValid) return aValid ? -1 : 1;
       if (aValid && bValid) {
-        return _aggregateScore(ar!).compareTo(_aggregateScore(br!));
+        return _aggregateScore(ar).compareTo(_aggregateScore(br));
       }
       return '${a.author}/${a.name}'.compareTo('${b.author}/${b.name}');
     });
