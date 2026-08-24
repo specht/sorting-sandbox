@@ -31,6 +31,6 @@ echo "==> Example/class algorithm repository"
 )
 
 echo "==> Algorithm validation, instrumentation and worker compilation"
-dart run tool/prepare_algorithms.dart --repo "$ROOT/algorithms" --compile-worker --no-pub-get
+dart run tool/build_algorithms.dart --repo "$ROOT/algorithms" --compile-worker --no-pub-get --force
 
 echo "✓ All checks passed"

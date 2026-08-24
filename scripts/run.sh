@@ -92,12 +92,12 @@ echo "==> Resolving application dependencies"
 flutter pub get
 
 echo "==> Preparing current class algorithms"
-dart run tool/prepare_algorithms.dart \
+dart run tool/build_algorithms.dart \
   --repo "$ALGORITHMS_REPO" \
   --compile-worker
 
-echo "==> Building the Flutter web application"
-flutter build web --release
+echo "==> Checking Flutter web application build"
+dart run tool/build_app.dart
 
 echo "==> Starting automatic algorithm watcher"
 dart run tool/watch_algorithms.dart --repo "$ALGORITHMS_REPO" &

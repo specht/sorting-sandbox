@@ -18,7 +18,7 @@ Future<void> main(List<String> args) async {
   stdout.writeln('Valid saves are rebuilt automatically; broken files are reported and skipped.');
 
   var fingerprint = _fingerprint(repo);
-  var pubspecStamp = _fileStamp(File('${repo.path}/pubspec.yaml'));
+  var dependencyStamp = _dependencyStamp(repo);
   String? pendingFingerprint;
   DateTime? lastChange;
   var pendingPubGet = false;
@@ -38,7 +38,7 @@ Future<void> main(List<String> args) async {
       pendingPubGet = false;
       final prepareArgs = <String>[
         'run',
-        'tool/prepare_algorithms.dart',
+        'tool/build_algorithms.dart',
         '--repo',
         repo.path,
         '--compile-worker',
@@ -65,9 +65,9 @@ Future<void> main(List<String> args) async {
     final next = _fingerprint(repo);
     if (next != fingerprint) {
       fingerprint = next;
-      final nextPubspecStamp = _fileStamp(File('${repo.path}/pubspec.yaml'));
-      if (nextPubspecStamp != pubspecStamp) {
-        pubspecStamp = nextPubspecStamp;
+      final nextDependencyStamp = _dependencyStamp(repo);
+      if (nextDependencyStamp != dependencyStamp) {
+        dependencyStamp = nextDependencyStamp;
         pendingPubGet = true;
       }
       pendingFingerprint = next;
@@ -117,6 +117,7 @@ String _fingerprint(Directory root) {
     final basename = parts.last;
     final interesting = entity.path.endsWith('.dart') ||
         basename == 'pubspec.yaml' ||
+        basename == 'pubspec.lock' ||
         basename == 'analysis_options.yaml';
     if (!interesting) continue;
 
@@ -126,6 +127,11 @@ String _fingerprint(Directory root) {
   entries.sort();
   return entries.join('\n');
 }
+
+
+String _dependencyStamp(Directory repo) =>
+    '${_fileStamp(File('${repo.path}/pubspec.yaml'))}|'
+    '${_fileStamp(File('${repo.path}/pubspec.lock'))}';
 
 String _fileStamp(File file) {
   if (!file.existsSync()) return 'missing';
