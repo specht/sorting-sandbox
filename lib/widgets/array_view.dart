@@ -103,20 +103,6 @@ class _ArrayPainter extends CustomPainter {
     final slot = size.width / values.length;
     final width = max(1.0, min(slot * .72, 8.0));
     final arrayColor = baseColor ?? scheme.primary;
-    final lightColor = Color.lerp(arrayColor, Colors.white, 0.26)!;
-    final darkColor = Color.lerp(arrayColor, Colors.black, 0.16)!;
-    final variableOutline = Color.lerp(
-      arrayColor,
-      scheme.onSurface,
-      0.42,
-    )!;
-    final arrayPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.bottomCenter,
-        end: Alignment.topCenter,
-        colors: [darkColor, arrayColor, lightColor],
-        stops: const [0, 0.58, 1],
-      ).createShader(Offset.zero & size);
 
     for (var i = 0; i < values.length; i++) {
       if (values[i] <= 0) continue;
@@ -129,24 +115,32 @@ class _ArrayPainter extends CustomPainter {
       final h = max(1.0, displayValue * (size.height - 8));
       final x = i * slot + (slot - width) / 2;
       final rect = Rect.fromLTWH(x, size.height - h, width, h);
+      final isVariable = variableIndices.contains(i);
+      final lightColor = Color.lerp(
+        arrayColor,
+        Colors.white,
+        isVariable ? 0.46 : 0.26,
+      )!;
+      final darkColor = Color.lerp(
+        arrayColor,
+        Colors.black,
+        isVariable ? 0.06 : 0.16,
+      )!;
       final paint = i == writeIndex
           ? (Paint()..color = scheme.error)
           : i == readIndex
               ? (Paint()..color = Colors.orange)
-              : arrayPaint;
+              : (Paint()
+                  ..shader = LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [darkColor, arrayColor, lightColor],
+                    stops: const [0, 0.58, 1],
+                  ).createShader(rect));
       canvas.drawRRect(
         RRect.fromRectAndRadius(rect, const Radius.circular(2)),
         paint,
       );
-      if (variableIndices.contains(i)) {
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(rect.inflate(1), const Radius.circular(3)),
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2
-            ..color = variableOutline,
-        );
-      }
     }
   }
 
