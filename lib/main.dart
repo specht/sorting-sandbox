@@ -247,7 +247,9 @@ class _HomeState extends State<_Home> {
       body: IndexedStack(index: _page, children: pages),
       bottomNavigationBar: SafeArea(
         minimum: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        child: Center(
+        child: Align(
+          alignment: Alignment.center,
+          heightFactor: 1,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 620),
             child: SizedBox(
