@@ -120,16 +120,8 @@ class _ArrayPainter extends CustomPainter {
       final x = i * slot + (slot - width) / 2;
       final rect = Rect.fromLTWH(x, size.height - h, width, h);
       final isVariable = variableIndices.contains(i);
-      final lightColor = Color.lerp(
-        arrayColor,
-        Colors.white,
-        isVariable ? 0.46 : 0.26,
-      )!;
-      final darkColor = Color.lerp(
-        arrayColor,
-        Colors.black,
-        isVariable ? 0.06 : 0.16,
-      )!;
+      final lightColor = Color.lerp(arrayColor, Colors.white, 0.26)!;
+      final darkColor = Color.lerp(arrayColor, Colors.black, 0.16)!;
       final paint = i == writeIndex
           ? (Paint()..color = scheme.error)
           : i == readIndex
@@ -145,6 +137,21 @@ class _ArrayPainter extends CustomPainter {
         RRect.fromRectAndRadius(rect, const Radius.circular(2)),
         paint,
       );
+
+      // Keep index-variable emphasis deliberately tiny: a short cap at the
+      // top of the bar connects the pointer label to the value without
+      // changing the bar's apparent width or its gradient.
+      if (isVariable && i != readIndex && i != writeIndex) {
+        final capWidth = min(width * 0.65, 4.0);
+        canvas.drawLine(
+          Offset(rect.center.dx - capWidth / 2, rect.top + 1),
+          Offset(rect.center.dx + capWidth / 2, rect.top + 1),
+          Paint()
+            ..color = scheme.onSurface.withValues(alpha: 0.55)
+            ..strokeWidth = 1.25
+            ..strokeCap = StrokeCap.round,
+        );
+      }
     }
   }
 
