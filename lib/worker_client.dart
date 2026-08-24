@@ -13,7 +13,7 @@ class WorkerTimeout implements Exception {
 
 class AlgorithmWorker {
   AlgorithmWorker({required String workerPath})
-      : _worker = web.Worker('runtime/$workerPath'.toJS) {
+    : _worker = web.Worker('runtime/$workerPath'.toJS) {
     _worker.onmessage = ((web.MessageEvent event) {
       final raw = event.data.dartify();
       if (raw is! String) return;
@@ -22,10 +22,7 @@ class AlgorithmWorker {
       _messages.add(message);
     }).toJS;
     _worker.onerror = ((web.Event event) {
-      _messages.add({
-        'type': 'error',
-        'message': 'Web Worker error',
-      });
+      _messages.add({'type': 'error', 'message': 'Web Worker error'});
     }).toJS;
   }
 
@@ -56,7 +53,9 @@ class AlgorithmWorker {
       if (eventRequestId == null && type != 'error') return;
       if (type == 'error') {
         if (!completer.isCompleted) {
-          completer.completeError(StateError(event['message']?.toString() ?? 'Worker error'));
+          completer.completeError(
+            StateError(event['message']?.toString() ?? 'Worker error'),
+          );
         }
         sub.cancel();
       } else if (type == 'benchmarkResult' || type == 'analysisResult') {
@@ -67,10 +66,15 @@ class AlgorithmWorker {
 
     send({...message, 'requestId': requestId});
     try {
-      return await completer.future.timeout(timeout, onTimeout: () {
-        terminate();
-        throw WorkerTimeout('Algorithm did not finish within ${timeout.inSeconds}s.');
-      });
+      return await completer.future.timeout(
+        timeout,
+        onTimeout: () {
+          terminate();
+          throw WorkerTimeout(
+            'Algorithm did not finish within ${timeout.inSeconds}s.',
+          );
+        },
+      );
     } finally {
       await sub.cancel();
     }

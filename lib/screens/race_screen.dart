@@ -280,10 +280,7 @@ class _RaceScreenState extends State<RaceScreen> {
                   const SizedBox(height: 10),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Size'),
-                      Text('n=$_n'),
-                    ],
+                    children: [const Text('Size'), Text('n=$_n')],
                   ),
                   Slider(
                     value: _sizes.indexOf(_n).toDouble(),
@@ -297,10 +294,7 @@ class _RaceScreenState extends State<RaceScreen> {
                   ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Speed'),
-                      Text('${_speed + 1} / 6'),
-                    ],
+                    children: [const Text('Speed'), Text('${_speed + 1} / 6')],
                   ),
                   Slider(
                     value: _speed.toDouble(),
@@ -320,9 +314,7 @@ class _RaceScreenState extends State<RaceScreen> {
                       onPressed: _running
                           ? () => _stop()
                           : (_selected.length >= 2 ? _start : null),
-                      icon: Icon(
-                        _running ? Icons.stop : Icons.sports_score,
-                      ),
+                      icon: Icon(_running ? Icons.stop : Icons.sports_score),
                       label: Text(_running ? 'Stop race' : 'Race'),
                     ),
                   ),

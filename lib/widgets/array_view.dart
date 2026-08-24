@@ -71,7 +71,11 @@ class ArrayView extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 6),
-        Text(label, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w600)),
+        Text(
+          label,
+          textAlign: TextAlign.center,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
       ],
     );
   }
@@ -129,14 +133,14 @@ class _ArrayPainter extends CustomPainter {
       final paint = i == writeIndex
           ? (Paint()..color = scheme.error)
           : i == readIndex
-              ? (Paint()..color = Colors.orange)
-              : (Paint()
-                  ..shader = LinearGradient(
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                    colors: [darkColor, arrayColor, lightColor],
-                    stops: const [0, 0.58, 1],
-                  ).createShader(rect));
+          ? (Paint()..color = Colors.orange)
+          : (Paint()
+              ..shader = LinearGradient(
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                colors: [darkColor, arrayColor, lightColor],
+                stops: const [0, 0.58, 1],
+              ).createShader(rect));
       canvas.drawRRect(
         RRect.fromRectAndRadius(rect, const Radius.circular(2)),
         paint,
@@ -205,10 +209,9 @@ class _VariablePointerPainter extends CustomPainter {
         maxLines: 1,
       )..layout(maxWidth: size.width);
 
-      final left = (x - textPainter.width / 2).clamp(
-        0.0,
-        max(0.0, size.width - textPainter.width),
-      ).toDouble();
+      final left = (x - textPainter.width / 2)
+          .clamp(0.0, max(0.0, size.width - textPainter.width))
+          .toDouble();
       textPainter.paint(canvas, Offset(left, 11));
     }
   }

@@ -163,7 +163,9 @@ class _HomeState extends State<_Home> {
               final diagnostic = widget.catalog.diagnostics[index];
               return ListTile(
                 contentPadding: EdgeInsets.zero,
-                title: Text(diagnostic.path.isEmpty ? 'Build' : diagnostic.path),
+                title: Text(
+                  diagnostic.path.isEmpty ? 'Build' : diagnostic.path,
+                ),
                 subtitle: SelectableText(diagnostic.message),
               );
             },
@@ -200,7 +202,8 @@ class _HomeState extends State<_Home> {
           if (widget.catalog.diagnostics.isNotEmpty)
             IconButton(
               onPressed: _showDiagnostics,
-              tooltip: '${widget.catalog.diagnostics.length} skipped algorithm file(s)',
+              tooltip:
+                  '${widget.catalog.diagnostics.length} skipped algorithm file(s)',
               icon: Badge(
                 label: Text('${widget.catalog.diagnostics.length}'),
                 child: const Icon(Icons.warning_amber_rounded),
@@ -219,11 +222,11 @@ class _HomeState extends State<_Home> {
         onDestinationSelected: (value) => setState(() => _page = value),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.sort), label: 'Explore'),
+          NavigationDestination(icon: Icon(Icons.sports_score), label: 'Race'),
           NavigationDestination(
-            icon: Icon(Icons.sports_score),
-            label: 'Race',
+            icon: Icon(Icons.query_stats),
+            label: 'Analyze',
           ),
-          NavigationDestination(icon: Icon(Icons.query_stats), label: 'Analyze'),
         ],
       ),
     );

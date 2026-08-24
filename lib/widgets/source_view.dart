@@ -21,7 +21,9 @@ class SourceView extends StatelessWidget {
           final number = index + 1;
           final selected = number == line;
           return Container(
-            color: selected ? Theme.of(context).colorScheme.primaryContainer : null,
+            color: selected
+                ? Theme.of(context).colorScheme.primaryContainer
+                : null,
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -41,7 +43,10 @@ class SourceView extends StatelessWidget {
                 Expanded(
                   child: Text(
                     lines[index],
-                    style: const TextStyle(fontFamily: 'monospace', fontSize: 12.5),
+                    style: const TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12.5,
+                    ),
                   ),
                 ),
               ],

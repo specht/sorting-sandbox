@@ -30,7 +30,10 @@ class AppDropdown<T> extends StatelessWidget {
         labelText: label,
         filled: true,
         fillColor: scheme.surfaceContainerHighest,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
         border: OutlineInputBorder(
           borderRadius: borderRadius,
           borderSide: BorderSide.none,

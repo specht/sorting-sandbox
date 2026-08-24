@@ -34,9 +34,15 @@ class AlgorithmPicker extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.circle, size: 14, color: parseHexColor(algorithm.color)),
+                Icon(
+                  Icons.circle,
+                  size: 14,
+                  color: parseHexColor(algorithm.color),
+                ),
                 const SizedBox(width: 8),
-                Flexible(child: Text('${algorithm.name} (${algorithm.author})')),
+                Flexible(
+                  child: Text('${algorithm.name} (${algorithm.author})'),
+                ),
               ],
             ),
           ),

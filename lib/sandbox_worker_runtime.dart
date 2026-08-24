@@ -42,11 +42,11 @@ class Metrics {
   int get score => reads + writes + comparisons;
 
   Map<String, int> toJson() => {
-        'reads': reads,
-        'writes': writes,
-        'comparisons': comparisons,
-        'score': score,
-      };
+    'reads': reads,
+    'writes': writes,
+    'comparisons': comparisons,
+    'score': score,
+  };
 }
 
 class ProbeState implements OperationProbe {
@@ -90,7 +90,8 @@ class ProbeState implements OperationProbe {
   }
 
   List<int> keys(String label) => arrays[label]!.map((e) => e.key).toList();
-  List<int> origins(String label) => arrays[label]!.map((e) => e.origin).toList();
+  List<int> origins(String label) =>
+      arrays[label]!.map((e) => e.origin).toList();
 }
 
 class CheckpointSession {
@@ -190,18 +191,15 @@ class RunResult {
   final Metrics metrics;
 
   Map<String, Object?> toJson() => {
-        'sorted': sorted,
-        'stable': stable,
-        'keys': keys,
-        'origins': origins,
-        'metrics': metrics.toJson(),
-      };
+    'sorted': sorted,
+    'stable': stable,
+    'keys': keys,
+    'origins': origins,
+    'metrics': metrics.toJson(),
+  };
 }
 
-RunResult runSyncAlgorithm(
-  dynamic algorithm,
-  List<int> values,
-) {
+RunResult runSyncAlgorithm(dynamic algorithm, List<int> values) {
   late ProbeState probe;
   probe = ProbeState(onOperation: () {});
   final list = Elements.runtime(

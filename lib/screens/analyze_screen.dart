@@ -274,15 +274,17 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
 
   Widget _chart(BuildContext context) {
     final resultCatalog = _resultsCatalog ?? widget.catalog;
-    final valid = resultCatalog.algorithms.where((algorithm) {
-      final result = _results[algorithm.id];
-      return result != null && result.correct && result.benchmarks.isNotEmpty;
-    }).toList()
-      ..sort(
-        (a, b) => _aggregateScore(
-          _results[a.id]!,
-        ).compareTo(_aggregateScore(_results[b.id]!)),
-      );
+    final valid =
+        resultCatalog.algorithms.where((algorithm) {
+          final result = _results[algorithm.id];
+          return result != null &&
+              result.correct &&
+              result.benchmarks.isNotEmpty;
+        }).toList()..sort(
+          (a, b) => _aggregateScore(
+            _results[a.id]!,
+          ).compareTo(_aggregateScore(_results[b.id]!)),
+        );
 
     if (valid.isEmpty) {
       return const Card(
@@ -412,10 +414,8 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     return _short(score);
   }
 
-  int _aggregateScore(AnalysisData result) => result.benchmarks.fold(
-    0,
-    (sum, point) => sum + point.metrics.score,
-  );
+  int _aggregateScore(AnalysisData result) =>
+      result.benchmarks.fold(0, (sum, point) => sum + point.metrics.score);
 
   List<AlgorithmMeta> _orderedAlgorithms() {
     final algorithms = List<AlgorithmMeta>.from(
@@ -453,11 +453,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
         separatorBuilder: (_, _) => const Divider(height: 1),
         itemBuilder: (context, index) {
           final algorithm = algorithms[index];
-          return _resultTile(
-            context,
-            algorithm,
-            rank: ranks[algorithm.id],
-          );
+          return _resultTile(context, algorithm, rank: ranks[algorithm.id]);
         },
       ),
     );
@@ -493,7 +489,9 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     final latest = result.benchmarks.isEmpty
         ? null
         : result.benchmarks.last.metrics;
-    final aggregate = result.benchmarks.isEmpty ? null : _aggregateScore(result);
+    final aggregate = result.benchmarks.isEmpty
+        ? null
+        : _aggregateScore(result);
     final status = result.timeout
         ? 'TIMEOUT'
         : result.error != null

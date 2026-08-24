@@ -332,12 +332,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
           child: ArrayView(
             values: _numbers,
             label: 'List to be sorted',
-            readIndex: _showMemoryAccess
-                ? _markerIndex(_read, 'list')
-                : null,
-            writeIndex: _showMemoryAccess
-                ? _markerIndex(_write, 'list')
-                : null,
+            readIndex: _showMemoryAccess ? _markerIndex(_read, 'list') : null,
+            writeIndex: _showMemoryAccess ? _markerIndex(_write, 'list') : null,
             baseColor: _algorithm == null
                 ? null
                 : parseHexColor(_algorithm!.color),
@@ -429,8 +425,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
             selected: _showMemoryAccess,
             avatar: const Icon(Icons.memory, size: 16),
             label: const Text('Highlight reads/writes'),
-            onSelected: (value) =>
-                setState(() => _showMemoryAccess = value),
+            onSelected: (value) => setState(() => _showMemoryAccess = value),
           ),
           if (_showMemoryAccess) ...[
             _legendDot(Colors.orange, 'read'),

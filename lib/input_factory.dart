@@ -3,12 +3,12 @@ import 'dart:math';
 enum InputShape { random, sorted, reversed, nearlySorted, fewValues }
 
 String inputShapeLabel(InputShape shape) => switch (shape) {
-      InputShape.random => 'Random',
-      InputShape.sorted => 'Sorted',
-      InputShape.reversed => 'Reversed',
-      InputShape.nearlySorted => 'Nearly sorted',
-      InputShape.fewValues => 'Few distinct values',
-    };
+  InputShape.random => 'Random',
+  InputShape.sorted => 'Sorted',
+  InputShape.reversed => 'Reversed',
+  InputShape.nearlySorted => 'Nearly sorted',
+  InputShape.fewValues => 'Few distinct values',
+};
 
 List<int> makeInput(int n, InputShape shape, {int seed = 42}) {
   final random = Random(seed);
@@ -34,6 +34,9 @@ List<int> makeInput(int n, InputShape shape, {int seed = 42}) {
       }
       return values;
     case InputShape.fewValues:
-      return List<int>.generate(n, (_) => random.nextInt(max(2, min(8, n + 1))));
+      return List<int>.generate(
+        n,
+        (_) => random.nextInt(max(2, min(8, n + 1))),
+      );
   }
 }

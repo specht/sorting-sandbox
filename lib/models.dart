@@ -10,14 +10,14 @@ class AlgorithmMeta {
   });
 
   factory AlgorithmMeta.fromJson(Map<String, dynamic> json) => AlgorithmMeta(
-        id: json['id'] as String,
-        author: json['author'] as String,
-        name: json['name'] as String,
-        color: json['color'] as String,
-        className: json['className'] as String,
-        path: json['path'] as String,
-        source: json['source'] as String,
-      );
+    id: json['id'] as String,
+    author: json['author'] as String,
+    name: json['name'] as String,
+    color: json['color'] as String,
+    className: json['className'] as String,
+    path: json['path'] as String,
+    source: json['source'] as String,
+  );
 
   final String id;
   final String author;
@@ -31,9 +31,14 @@ class AlgorithmMeta {
 }
 
 class BuildDiagnostic {
-  BuildDiagnostic({required this.path, required this.author, required this.message});
+  BuildDiagnostic({
+    required this.path,
+    required this.author,
+    required this.message,
+  });
 
-  factory BuildDiagnostic.fromJson(Map<String, dynamic> json) => BuildDiagnostic(
+  factory BuildDiagnostic.fromJson(Map<String, dynamic> json) =>
+      BuildDiagnostic(
         path: json['path']?.toString() ?? '',
         author: json['author']?.toString() ?? '',
         message: json['message']?.toString() ?? '',
@@ -67,11 +72,11 @@ class MetricsData {
   });
 
   factory MetricsData.fromJson(Map<String, dynamic> json) => MetricsData(
-        reads: (json['reads'] as num?)?.toInt() ?? 0,
-        writes: (json['writes'] as num?)?.toInt() ?? 0,
-        comparisons: (json['comparisons'] as num?)?.toInt() ?? 0,
-        score: (json['score'] as num?)?.toInt() ?? 0,
-      );
+    reads: (json['reads'] as num?)?.toInt() ?? 0,
+    writes: (json['writes'] as num?)?.toInt() ?? 0,
+    comparisons: (json['comparisons'] as num?)?.toInt() ?? 0,
+    score: (json['score'] as num?)?.toInt() ?? 0,
+  );
 
   final int reads;
   final int writes;
@@ -108,16 +113,27 @@ class VisualFrame {
   });
 
   factory VisualFrame.fromJson(Map<String, dynamic> json) => VisualFrame(
-        numbers: (json['numbers'] as List).cast<num>().map((e) => e.toInt()).toList(),
-        scratch: (json['scratch'] as List).cast<num>().map((e) => e.toInt()).toList(),
-        origins: (json['origins'] as List).cast<num>().map((e) => e.toInt()).toList(),
-        metrics: MetricsData.fromJson((json['metrics'] as Map).cast<String, dynamic>()),
-        line: (json['line'] as num?)?.toInt() ?? 0,
-        locals: (json['locals'] as Map?)?.cast<String, dynamic>() ?? const {},
-        read: MarkerData.fromJson(json['read']),
-        write: MarkerData.fromJson(json['write']),
-        done: json['done'] == true,
-      );
+    numbers: (json['numbers'] as List)
+        .cast<num>()
+        .map((e) => e.toInt())
+        .toList(),
+    scratch: (json['scratch'] as List)
+        .cast<num>()
+        .map((e) => e.toInt())
+        .toList(),
+    origins: (json['origins'] as List)
+        .cast<num>()
+        .map((e) => e.toInt())
+        .toList(),
+    metrics: MetricsData.fromJson(
+      (json['metrics'] as Map).cast<String, dynamic>(),
+    ),
+    line: (json['line'] as num?)?.toInt() ?? 0,
+    locals: (json['locals'] as Map?)?.cast<String, dynamic>() ?? const {},
+    read: MarkerData.fromJson(json['read']),
+    write: MarkerData.fromJson(json['write']),
+    done: json['done'] == true,
+  );
 
   final List<int> numbers;
   final List<int> scratch;
@@ -134,9 +150,9 @@ class BenchmarkPoint {
   BenchmarkPoint({required this.n, required this.metrics});
 
   factory BenchmarkPoint.fromJson(Map<String, dynamic> json) => BenchmarkPoint(
-        n: (json['n'] as num).toInt(),
-        metrics: MetricsData.fromJson(json),
-      );
+    n: (json['n'] as num).toInt(),
+    metrics: MetricsData.fromJson(json),
+  );
 
   final int n;
   final MetricsData metrics;
@@ -154,14 +170,14 @@ class AnalysisData {
   });
 
   factory AnalysisData.fromJson(Map<String, dynamic> json) => AnalysisData(
-        correct: json['correct'] == true,
-        stable: json['stable'] as bool?,
-        stabilityNote: json['stabilityNote']?.toString(),
-        failingCase: json['failingCase']?.toString(),
-        benchmarks: ((json['benchmarks'] as List?) ?? const [])
-            .map((e) => BenchmarkPoint.fromJson((e as Map).cast<String, dynamic>()))
-            .toList(),
-      );
+    correct: json['correct'] == true,
+    stable: json['stable'] as bool?,
+    stabilityNote: json['stabilityNote']?.toString(),
+    failingCase: json['failingCase']?.toString(),
+    benchmarks: ((json['benchmarks'] as List?) ?? const [])
+        .map((e) => BenchmarkPoint.fromJson((e as Map).cast<String, dynamic>()))
+        .toList(),
+  );
 
   final bool correct;
   final bool? stable;
