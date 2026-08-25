@@ -6,6 +6,206 @@ The central rule is deliberately strict: **students write normal sorting code**.
 They do not add animation calls, yields, benchmark hooks, stability metadata or
 variable tracing. The sandbox builds those capabilities around their source.
 
+## Schnellstart für Schüler:innen
+
+Ihr arbeitet mit zwei Git-Repositories:
+
+- `~/sorting-sandbox/` enthält die App und wird von der Lehrkraft gepflegt.
+- `~/sorting-sandbox/algorithms/` enthält eure Algorithmen und wird von der
+  ganzen Klasse gemeinsam benutzt.
+
+Ändert und veröffentlicht nur Dateien im Verzeichnis `algorithms/`.
+
+### 1. Bei GitLab anmelden
+
+Öffne [git.nhcham.org](https://git.nhcham.org/) im Browser und melde dich an.
+
+### 2. SSH-Schlüssel erstellen und bei GitLab hinterlegen
+
+Prüfe zuerst im Terminal, ob bereits ein Schlüssel vorhanden ist:
+
+```bash
+ls ~/.ssh/id_ed25519.pub
+```
+
+Wird die Datei angezeigt, verwende diesen Schlüssel und fahre mit `cat` unten
+fort. Falls `No such file or directory` erscheint, erzeuge einen neuen:
+
+```bash
+ssh-keygen -t ed25519 -C "Vorname Nachname"
+```
+
+Bestätige den vorgeschlagenen Speicherort mit Enter. Eine Passphrase kannst du
+für den Schul-Workspace leer lassen und ebenfalls mit Enter bestätigen.
+
+Zeige anschließend den **öffentlichen** Schlüssel an:
+
+```bash
+cat ~/.ssh/id_ed25519.pub
+```
+
+Kopiere die gesamte ausgegebene Zeile. Sie beginnt mit `ssh-ed25519`. Kopiere
+niemals die private Datei `~/.ssh/id_ed25519` und lade sie nirgendwo hoch.
+
+Gehe in GitLab oben rechts auf dein Profilbild und dann auf **Edit profile →
+Access → SSH keys → Add new key**. Füge die kopierte Zeile bei **Key** ein,
+vergib einen Titel wie `Workspace` und speichere den Schlüssel.
+
+Teste danach die Verbindung:
+
+```bash
+ssh -T git@git.nhcham.org
+```
+
+Bestätige beim ersten Verbindungsaufbau die Rückfrage mit `yes`. Danach sollte
+GitLab dich mit deinem Benutzernamen begrüßen.
+
+### 3. Git einmalig einrichten
+
+Verwende deinen echten Namen und die E-Mail-Adresse deines GitLab-Kontos:
+
+```bash
+git config --global user.name "Vorname Nachname"
+git config --global user.email "deine.mail@example.org"
+```
+
+### 4. Das gemeinsame Algorithmus-Repository klonen
+
+Wechsle in das Verzeichnis der App und klone das Klassen-Repository genau in
+den Unterordner `algorithms`:
+
+```bash
+cd ~/sorting-sandbox
+git clone git@git.nhcham.org:specht/sorting-sandbox-algorithms-2026.git algorithms
+```
+
+Falls `algorithms` bereits als Git-Repository vorhanden ist, klone es nicht
+erneut. Hole stattdessen den aktuellen Stand:
+
+```bash
+git -C algorithms pull --rebase
+```
+
+### 5. Die App starten
+
+Starte die App im Verzeichnis `~/sorting-sandbox`:
+
+```bash
+./run
+```
+
+Der Browser öffnet sich automatisch. Lasse dieses Terminal geöffnet, solange
+du mit der App arbeitest. Für weitere Befehle öffnest du ein zweites Terminal.
+
+### 6. Deinen Algorithmus hinzufügen
+
+Hole zuerst die neuesten Algorithmen deiner Mitschüler:innen:
+
+```bash
+git -C algorithms pull --rebase
+```
+
+Lege unter `algorithms/` einen eigenen Ordner mit deinem vereinbarten Namen oder
+Kürzel an, zum Beispiel `algorithms/anna/`. Erstelle darin eine Dart-Datei mit
+einem eindeutigen Klassennamen, zum Beispiel
+`algorithms/anna/bubble_sort.dart`:
+
+```dart
+import 'package:sorting_sandbox_api/sorting_sandbox_api.dart';
+
+class BubbleSortAnna extends SortingAlgorithm {
+  get name => 'Bubble Sort';
+  get color => Colors.green;
+
+  void sort(Elements list, Elements scratch) {
+    int length = list.length;
+    for (int i = 0; i < length; i++) {
+      for (int j = 0; j < length - i - 1; j++) {
+        if (list[j] > list[j + 1]) list.swap(j, j + 1);
+      }
+    }
+  }
+}
+```
+
+Ändere Ordner-, Datei- und Klassennamen passend zu dir und deinem Algorithmus.
+Der Name des Ordners wird in der App als Autor:in angezeigt; ein `author`-Feld
+gehört daher nicht in die Datei. Jede `.dart`-Datei enthält genau eine Klasse,
+die von `SortingAlgorithm` erbt.
+
+Sobald du die Datei speicherst, prüft die laufende App sie automatisch. Bei
+einem Fehler wird eine Diagnose angezeigt; nach der Korrektur erscheint der
+Algorithmus ohne Neustart wieder in der App.
+
+### 7. Deinen Algorithmus mit der Klasse teilen
+
+Die folgenden Befehle werden weiterhin in `~/sorting-sandbox` ausgeführt.
+Ersetze den Beispielpfad durch den Pfad zu deiner Datei:
+
+```bash
+git -C algorithms status
+git -C algorithms add anna/bubble_sort.dart
+git -C algorithms commit -m "Add Anna's bubble sort"
+git -C algorithms pull --rebase
+git -C algorithms push
+```
+
+Das abschließende `pull --rebase` holt Änderungen, die andere seit deinem
+letzten Pull veröffentlicht haben. Falls dabei ein Konflikt gemeldet wird,
+frage nach Hilfe und überschreibe keine fremden Dateien. Nach dem erfolgreichen
+`push` können alle den neuen Algorithmus mit diesem Befehl holen:
+
+```bash
+git -C algorithms pull --rebase
+```
+
+Für die nächste Arbeitsstunde aktualisierst du App und Algorithmen und startest
+danach wieder:
+
+```bash
+cd ~/sorting-sandbox
+git pull
+git -C algorithms pull --rebase
+./run
+```
+
+### 8. Eine Android-APK bauen
+
+Speichere, committe und pushe zuerst deine Arbeit. Beende anschließend die
+laufende App im ersten Terminal mit Strg+C. Der APK-Bau benötigt viele
+Ressourcen: Starte den Workspace vorher neu, wenn er schon länger läuft oder
+der Build wegen fehlendem Speicher beziehungsweise zu vieler Prozesse
+abbricht.
+
+Öffne nach dem Neustart ein Terminal und führe aus:
+
+```bash
+cd ~/sorting-sandbox
+git pull
+git -C algorithms pull --rebase
+./build-apk
+```
+
+Der Build kann einige Minuten dauern. Die fertige Datei enthält den aktuellen
+Stand aller Klassenalgorithmen und liegt hier:
+
+```text
+build/app/outputs/flutter-apk/app-release.apk
+```
+
+Du kannst sie im Datei-Explorer des Workspace per Rechtsklick herunterladen.
+
+### Häufige Probleme
+
+- `Permission denied (publickey)`: Prüfe, ob du wirklich den Inhalt von
+  `id_ed25519.pub` bei GitLab hinterlegt hast, und teste erneut mit `ssh -T`.
+- `rejected` oder `non-fast-forward` beim Push: Führe
+  `git -C algorithms pull --rebase` aus und pushe danach erneut.
+- Der neue Algorithmus erscheint nicht: Sieh im Terminal mit `./run` nach der
+  Fehlermeldung und korrigiere die genannte Dart-Datei.
+- Der APK-Build scheitert wegen Ressourcen: Beende `./run`, starte den
+  Workspace neu und führe nur `./build-apk` aus.
+
 ## Student-facing algorithm API
 
 A submission still looks like this:
