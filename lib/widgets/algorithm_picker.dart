@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../algorithm_order.dart';
 import '../color_utils.dart';
 import '../models.dart';
 import 'app_dropdown.dart';
@@ -23,12 +24,13 @@ class AlgorithmPicker extends StatelessWidget {
     final selectedId = value != null && algorithms.any((a) => a.id == value!.id)
         ? value!.id
         : null;
+    final orderedAlgorithms = algorithmsInDisplayOrder(algorithms);
     return AppDropdown<String>(
       label: 'Algorithm',
       value: selectedId,
       enabled: enabled,
       items: [
-        for (final algorithm in algorithms)
+        for (final algorithm in orderedAlgorithms)
           DropdownMenuItem(
             value: algorithm.id,
             child: Row(

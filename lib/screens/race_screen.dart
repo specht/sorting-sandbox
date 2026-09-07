@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../algorithm_order.dart';
 import '../color_utils.dart';
 import '../format_utils.dart';
 import '../input_factory.dart';
@@ -122,10 +123,13 @@ class _RaceScreenState extends State<RaceScreen> {
     0,
   ];
 
+  List<AlgorithmMeta> get _algorithms =>
+      algorithmsInDisplayOrder(widget.catalog.algorithms);
+
   @override
   void initState() {
     super.initState();
-    for (final algorithm in widget.catalog.algorithms.take(2)) {
+    for (final algorithm in _algorithms.take(2)) {
       _selected.add(algorithm.id);
     }
     _refreshPreview(newInput: true);
@@ -154,7 +158,7 @@ class _RaceScreenState extends State<RaceScreen> {
     final available = widget.catalog.algorithms.map((a) => a.id).toSet();
     _selected.removeWhere((id) => !available.contains(id));
     if (_selected.length < 2) {
-      for (final algorithm in widget.catalog.algorithms) {
+      for (final algorithm in _algorithms) {
         if (_selected.length >= 2) break;
         _selected.add(algorithm.id);
       }
@@ -165,7 +169,7 @@ class _RaceScreenState extends State<RaceScreen> {
     if (newInput || _previewInput.length != _n) {
       _previewInput = makeInput(_n, _shape, seed: ++_seed);
     }
-    final algorithms = widget.catalog.algorithms
+    final algorithms = _algorithms
         .where((algorithm) => _selected.contains(algorithm.id))
         .toList();
     _lanes
@@ -192,7 +196,7 @@ class _RaceScreenState extends State<RaceScreen> {
     _stop(updateState: false);
     if (_previewInput.length != _n) _refreshPreview(newInput: true);
     final input = List<int>.from(_previewInput);
-    final algorithms = widget.catalog.algorithms
+    final algorithms = _algorithms
         .where((a) => _selected.contains(a.id))
         .toList();
     _lanes
@@ -394,7 +398,7 @@ class _RaceScreenState extends State<RaceScreen> {
                                 runSpacing: 6,
                                 children: [
                                   for (final algorithm
-                                      in widget.catalog.algorithms)
+                                      in _algorithms)
                                     FilterChip(
                                       label: Text(
                                         '${algorithm.name} · ${algorithm.author}',

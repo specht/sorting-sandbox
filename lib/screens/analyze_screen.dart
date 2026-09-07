@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
+import '../algorithm_order.dart';
 import '../color_utils.dart';
 import '../format_utils.dart';
 import '../input_factory.dart';
@@ -29,6 +30,10 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
   int _generation = 0;
   bool _catalogUpdatePending = false;
   AlgorithmCatalog? _resultsCatalog;
+  final TransformationController _chartTransformationController =
+      TransformationController();
+  String? _hoveredAlgorithmId;
+  String? _pinnedAlgorithmId;
 
   static const _sizes = [32, 64, 128, 256, 512, 1024, 2048];
 
@@ -41,6 +46,9 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     } else {
       _results.clear();
       _resultsCatalog = null;
+      _hoveredAlgorithmId = null;
+      _pinnedAlgorithmId = null;
+      _resetChartZoom();
       _catalogUpdatePending = false;
     }
   }
@@ -48,6 +56,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
   @override
   void dispose() {
     _stop(updateState: false);
+    _chartTransformationController.dispose();
     super.dispose();
   }
 
@@ -59,10 +68,13 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
     final cases = [
       for (final n in _sizes) makeInput(n, _shape, seed: 1000 + n),
     ];
+    _resetChartZoom();
     setState(() {
       _running = true;
       _results.clear();
       _resultsCatalog = catalog;
+      _hoveredAlgorithmId = null;
+      _pinnedAlgorithmId = null;
     });
 
     for (final algorithm in catalog.algorithms) {
@@ -228,7 +240,10 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                     visualDensity: VisualDensity.compact,
                     selected: _logX,
                     label: const Text('Log x'),
-                    onSelected: (value) => setState(() => _logX = value),
+                    onSelected: (value) {
+                      _resetChartZoom();
+                      setState(() => _logX = value);
+                    },
                   ),
                 ),
                 const SizedBox(width: 4),
@@ -238,7 +253,10 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                     visualDensity: VisualDensity.compact,
                     selected: _logY,
                     label: const Text('Log y'),
-                    onSelected: (value) => setState(() => _logY = value),
+                    onSelected: (value) {
+                      _resetChartZoom();
+                      setState(() => _logY = value);
+                    },
                   ),
                 ),
               ],
@@ -297,6 +315,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
             _results[a.id]!,
           ).compareTo(_aggregateScore(_results[b.id]!)),
         );
+    final highlightedId = _pinnedAlgorithmId ?? _hoveredAlgorithmId;
 
     if (valid.isEmpty) {
       return const Card(
@@ -310,19 +329,65 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              child: Text(
-                _chartTitle(),
-                key: ValueKey((_logX, _logY)),
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: Text(
+                      _chartTitle(),
+                      key: ValueKey((_logX, _logY)),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ),
+                Tooltip(
+                  message: 'Pinch/scroll to zoom · drag to pan',
+                  child: Icon(
+                    Icons.zoom_in_rounded,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+                if (_pinnedAlgorithmId != null)
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: 'Unpin highlighted algorithm',
+                    onPressed: () => setState(() => _pinnedAlgorithmId = null),
+                    icon: const Icon(Icons.push_pin_outlined, size: 18),
+                  ),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'Reset chart zoom',
+                  onPressed: _resetChartZoom,
+                  icon: const Icon(Icons.fit_screen_rounded, size: 18),
+                ),
+              ],
             ),
             const SizedBox(height: 8),
             Expanded(
               child: LineChart(
                 LineChartData(
                   lineTouchData: LineTouchData(
+                    touchSpotThreshold: 36,
+                    distanceCalculator: (touchPoint, spotPixelCoordinates) =>
+                        (touchPoint - spotPixelCoordinates).distance,
+                    mouseCursorResolver: (_, response) =>
+                        response?.lineBarSpots?.isNotEmpty == true
+                        ? SystemMouseCursors.precise
+                        : SystemMouseCursors.basic,
+                    touchCallback: (event, response) {
+                      final spots = response?.lineBarSpots;
+                      final id = spots == null || spots.isEmpty
+                          ? null
+                          : valid[spots.first.barIndex].id;
+                      if (event is FlPointerHoverEvent ||
+                          event is FlPointerEnterEvent) {
+                        _setHoveredAlgorithm(id);
+                      } else if (event is FlPointerExitEvent) {
+                        _setHoveredAlgorithm(null);
+                      }
+                    },
                     touchTooltipData: LineTouchTooltipData(
                       getTooltipColor: (_) => scheme.surfaceContainerLowest,
                       tooltipBorder: BorderSide(color: scheme.outlineVariant),
@@ -332,28 +397,14 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                         vertical: 8,
                       ),
                       tooltipMargin: 10,
-                      maxContentWidth: 88,
+                      maxContentWidth: 240,
                       fitInsideHorizontally: true,
                       fitInsideVertically: true,
                       getTooltipItems: (spots) => [
-                        for (final spot in spots)
-                          LineTooltipItem(
-                            _short(
-                              _results[valid[spot.barIndex].id]!
-                                  .benchmarks[spot.spotIndex]
-                                  .metrics
-                                  .score,
-                            ),
-                            TextStyle(
-                              color: Color.lerp(
-                                parseHexColor(valid[spot.barIndex].color),
-                                scheme.onSurface,
-                                0.50,
-                              ),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
+                        for (var i = 0; i < spots.length; i++)
+                          i == 0
+                              ? _chartTooltipItem(spots[i], valid, scheme)
+                              : null,
                       ],
                     ),
                   ),
@@ -391,25 +442,38 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
                       ),
                     ),
                   ),
-                  lineBarsData: [
-                    for (final algorithm in valid)
-                      LineChartBarData(
-                        isCurved: false,
-                        barWidth: 2,
-                        dotData: const FlDotData(show: true),
-                        color: parseHexColor(algorithm.color),
-                        spots: [
-                          for (final point
-                              in _results[algorithm.id]!.benchmarks)
-                            FlSpot(
-                              _plotX(point.n),
-                              _plotY(point.metrics.score),
-                            ),
-                        ],
-                      ),
-                  ],
+                  lineBarsData: valid.map((algorithm) {
+                    final isHighlighted = highlightedId == algorithm.id;
+                    final isDimmed = highlightedId != null && !isHighlighted;
+                    final color = parseHexColor(algorithm.color);
+                    return LineChartBarData(
+                      isCurved: false,
+                      barWidth: isHighlighted ? 4 : (isDimmed ? 1 : 2),
+                      dotData: FlDotData(show: !isDimmed),
+                      color: isDimmed
+                          ? color.withValues(alpha: 0.14)
+                          : color,
+                      spots: [
+                        for (final point
+                            in _results[algorithm.id]!.benchmarks)
+                          FlSpot(
+                            _plotX(point.n),
+                            _plotY(point.metrics.score),
+                          ),
+                      ],
+                    );
+                  }).toList(),
                 ),
-                duration: const Duration(milliseconds: 320),
+                transformationConfig: FlTransformationConfig(
+                  scaleAxis: FlScaleAxis.free,
+                  minScale: 1,
+                  maxScale: 12,
+                  panEnabled: true,
+                  scaleEnabled: true,
+                  trackpadScrollCausesScale: true,
+                  transformationController: _chartTransformationController,
+                ),
+                duration: const Duration(milliseconds: 160),
                 curve: Curves.easeOutCubic,
               ),
             ),
@@ -438,6 +502,48 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _setHoveredAlgorithm(String? id) {
+    if (_hoveredAlgorithmId == id) return;
+    setState(() => _hoveredAlgorithmId = id);
+  }
+
+  void _togglePinnedAlgorithm(String id) {
+    setState(() {
+      _pinnedAlgorithmId = _pinnedAlgorithmId == id ? null : id;
+    });
+  }
+
+  void _resetChartZoom() {
+    _chartTransformationController.value =
+        _chartTransformationController.value.clone()..setIdentity();
+  }
+
+  LineTooltipItem _chartTooltipItem(
+    LineBarSpot spot,
+    List<AlgorithmMeta> algorithms,
+    ColorScheme scheme,
+  ) {
+    final algorithm = algorithms[spot.barIndex];
+    final point = _results[algorithm.id]!.benchmarks[spot.spotIndex];
+    return LineTooltipItem(
+      '${algorithm.name} · ${algorithm.author}\n'
+      'n=${point.n} · score ${_short(point.metrics.score)}\n'
+      '${_short(point.metrics.reads)} reads · '
+      '${_short(point.metrics.writes)} writes\n'
+      '${_short(point.metrics.comparisons)} comparisons',
+      TextStyle(
+        color: Color.lerp(
+          parseHexColor(algorithm.color),
+          scheme.onSurface,
+          0.62,
+        ),
+        fontSize: 11.5,
+        fontWeight: FontWeight.w600,
+      ),
+      textAlign: TextAlign.left,
     );
   }
 
@@ -479,7 +585,7 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
       if (aValid && bValid) {
         return _aggregateScore(ar).compareTo(_aggregateScore(br));
       }
-      return '${a.author}/${a.name}'.compareTo('${b.author}/${b.name}');
+      return compareAlgorithmsForDisplay(a, b);
     });
     return algorithms;
   }
@@ -502,7 +608,35 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
         separatorBuilder: (_, _) => const Divider(height: 1),
         itemBuilder: (context, index) {
           final algorithm = algorithms[index];
-          return _resultTile(context, algorithm, rank: ranks[algorithm.id]);
+          final tile = _resultTile(
+            context,
+            algorithm,
+            rank: ranks[algorithm.id],
+          );
+          final result = _results[algorithm.id];
+          final canHighlight =
+              result != null && result.correct && result.benchmarks.isNotEmpty;
+          if (!canHighlight) return tile;
+
+          final highlighted =
+              (_pinnedAlgorithmId ?? _hoveredAlgorithmId) == algorithm.id;
+          return MouseRegion(
+            cursor: SystemMouseCursors.click,
+            onEnter: (_) => _setHoveredAlgorithm(algorithm.id),
+            onExit: (_) => _setHoveredAlgorithm(null),
+            child: InkWell(
+              onTap: () => _togglePinnedAlgorithm(algorithm.id),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                color: highlighted
+                    ? parseHexColor(
+                        algorithm.color,
+                      ).withValues(alpha: 0.10)
+                    : Colors.transparent,
+                child: tile,
+              ),
+            ),
+          );
         },
       ),
     );
