@@ -78,12 +78,17 @@ class Element {
     return _key == other._key;
   }
 
+  // Equal Elements must have equal hash codes, but the hash itself must not
+  // reveal anything about the private sorting key.
   @override
-  int get hashCode => _key.hashCode;
+  int get hashCode => 0;
 
-  /// Only for visualization/debug output. Sorting code should compare Elements.
+  /// Deliberately opaque to sorting code.
+  ///
+  /// The visual debugger gets privileged values through [OperationProbe]
+  /// instead of exposing the key through this method.
   @override
-  String toString() => _key.toString();
+  String toString() => 'Element';
 
   ElementState _state() => ElementState(_key, _origin);
 }
@@ -116,13 +121,13 @@ class Elements {
 
   Element operator [](int index) {
     final value = _elements[index];
-    _probe.onRead(_label, index, value._state());
+    _probe.onRead(_label, index, value, value._state());
     return value;
   }
 
   void operator []=(int index, Element value) {
     _elements[index] = value;
-    _probe.onWrite(_label, index, value._state());
+    _probe.onWrite(_label, index, value, value._state());
   }
 
   /// Convenience only: exactly the same two reads and two writes as a
@@ -150,7 +155,17 @@ class ElementState {
 /// Callback surface implemented by the sandbox runtime.
 abstract interface class OperationProbe {
   void onInit(String label, List<ElementState> values);
-  void onRead(String label, int index, ElementState value);
-  void onWrite(String label, int index, ElementState value);
+  void onRead(
+    String label,
+    int index,
+    Element element,
+    ElementState value,
+  );
+  void onWrite(
+    String label,
+    int index,
+    Element element,
+    ElementState value,
+  );
   void onComparison();
 }

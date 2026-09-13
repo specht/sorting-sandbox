@@ -55,6 +55,8 @@ class ProbeState implements OperationProbe {
   final void Function() onOperation;
   final Metrics metrics = Metrics();
   final Map<String, List<ElementState>> arrays = {};
+  final Map<Element, ElementState> _debugStates =
+      Map<Element, ElementState>.identity();
 
   String? readList;
   int? readIndex;
@@ -75,7 +77,13 @@ class ProbeState implements OperationProbe {
   }
 
   @override
-  void onRead(String label, int index, ElementState value) {
+  void onRead(
+    String label,
+    int index,
+    Element element,
+    ElementState value,
+  ) {
+    _debugStates[element] = value;
     metrics.reads++;
     readList = label;
     readIndex = index;
@@ -84,7 +92,13 @@ class ProbeState implements OperationProbe {
   }
 
   @override
-  void onWrite(String label, int index, ElementState value) {
+  void onWrite(
+    String label,
+    int index,
+    Element element,
+    ElementState value,
+  ) {
+    _debugStates[element] = value;
     metrics.writes++;
     arrays[label]![index] = value;
     writeList = label;
@@ -129,6 +143,8 @@ class ProbeState implements OperationProbe {
     return result;
   }
 
+  ElementState? debugState(Element element) => _debugStates[element];
+
   List<int> keys(String label) => arrays[label]!.map((e) => e.key).toList();
   List<int> origins(String label) =>
       arrays[label]!.map((e) => e.origin).toList();
@@ -166,7 +182,8 @@ class CheckpointSession {
     checkpointIndex++;
     currentLine = line;
     currentLocals = <String, Object?>{
-      for (final entry in locals.entries) entry.key: _debugValue(entry.value),
+      for (final entry in locals.entries)
+        entry.key: _debugValue(entry.value, probe),
     };
 
     if (_budget > 0) {
@@ -217,11 +234,11 @@ class CheckpointSession {
   }
 }
 
-Object? _debugValue(Object? value) {
+Object? _debugValue(Object? value, ProbeState probe) {
   if (value == null || value is num || value is bool || value is String) {
     return value;
   }
-  if (value is Element) return value.toString();
+  if (value is Element) return probe.debugState(value)?.key ?? 'Element';
   return value.toString();
 }
 

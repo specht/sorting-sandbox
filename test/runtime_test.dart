@@ -48,6 +48,28 @@ void main() {
     expect(unstable.stable, isFalse);
   });
 
+  test('visual checkpoints can show an opaque Element value', () async {
+    final frames = <Map<String, Object?>>[];
+    final session = CheckpointSession(emitFrame: frames.add);
+    final list = Elements.runtime(
+      probe: session.probe,
+      label: 'list',
+      values: [137, 42],
+    );
+
+    final pivot = list[0];
+    expect(pivot.toString(), 'Element');
+
+    final checkpoint = session.checkpoint(10, {'pivot': pivot});
+    await Future<void>.delayed(Duration.zero);
+
+    final locals = (frames.single['locals'] as Map).cast<String, Object?>();
+    expect(locals['pivot'], 137);
+
+    session.addBudget(1);
+    await checkpoint;
+    session.finish();
+  });
 
   test('visual frames preserve every read and write in one source step', () async {
     final frames = <Map<String, Object?>>[];

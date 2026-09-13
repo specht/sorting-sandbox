@@ -13,10 +13,12 @@ class Probe implements OperationProbe {
   void onInit(String label, List<ElementState> values) {}
 
   @override
-  void onRead(String label, int index, ElementState value) => reads++;
+  void onRead(String label, int index, Element element, ElementState value) =>
+      reads++;
 
   @override
-  void onWrite(String label, int index, ElementState value) => writes++;
+  void onWrite(String label, int index, Element element, ElementState value) =>
+      writes++;
 }
 
 void main() {
@@ -34,6 +36,25 @@ void main() {
     b[0] = temp;
     expect(p2.reads, p1.reads);
     expect(p2.writes, p1.writes);
+  });
+
+  test('Element does not expose its sorting key', () {
+    final p = Probe();
+    final list = Elements.runtime(
+      probe: p,
+      label: 'list',
+      values: [137, 42, 137],
+    );
+
+    final first = list[0];
+    final second = list[1];
+    final equalToFirst = list[2];
+
+    expect(first.toString(), 'Element');
+    expect(int.tryParse(first.toString()), isNull);
+    expect(first.hashCode, second.hashCode);
+    expect(first == equalToFirst, isTrue);
+    expect(first.hashCode, equalToFirst.hashCode);
   });
 
   test('comparisons are counted', () {
