@@ -42,7 +42,6 @@ input[type=checkbox]{accent-color:#89baff}
 .topbar{display:flex;align-items:center;gap:18px;min-height:54px;border-bottom:1px solid var(--border)}
 .brand{display:flex;flex-direction:column;gap:1px;min-width:0}
 .brand strong{font-size:12.5px;letter-spacing:.12em}
-.brand span{font-size:10.5px;color:var(--muted)}
 .tabs{display:flex;gap:2px;padding:3px;border:1px solid #324761;border-radius:9px;background:#101b2b}
 .tabs button{border:1px solid transparent;background:transparent;color:#a9bedb;padding:6px 13px;border-radius:6px}
 .tabs button[aria-selected=true]{background:#356bb1;border-color:#649ce5;color:#fff}
@@ -316,7 +315,6 @@ input[type=checkbox]{accent-color:#89baff}
 .problems-dialog{width:min(760px,calc(100vw - 28px))}
 .dialog-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 18px 13px;border-bottom:1px solid var(--border)}
 .dialog-header h2{font-size:18px;margin:3px 0 0}
-.eyebrow{color:#7e9cbf;font-size:10px;font-weight:750;letter-spacing:.12em}
 .dialog-close{border-color:transparent;background:transparent;color:#aebfd6}
 .dialog-body{min-height:0;overflow:auto;padding:0 18px 4px}
 .dialog-status{margin:14px 0 10px;font-size:13px;color:var(--muted)}
