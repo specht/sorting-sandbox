@@ -620,6 +620,9 @@ export class ExploreView {
     let summary;
     if (kind === 'compile') {
       summary = 'The algorithm does not compile · see the problems below the editor.';
+    } else if (kind === 'unavailable') {
+      summary = 'The sandbox could not build this algorithm. Try again.';
+      this.addConsole({kind: 'error', text: error.message ?? 'Build failed.', line: null, always: true});
     } else if (kind === 'timeout') {
       summary = 'Stopped: no progress for several seconds.';
       this.addConsole({kind: 'timeout', text: error.message, line: error.line ?? null, always: true});

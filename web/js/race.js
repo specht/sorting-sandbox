@@ -21,6 +21,7 @@ export class RaceView {
     this.seed = 100 + Math.floor(Math.random() * 1000);
     this.input = [];
     this.lanes = [];
+    this.raced = false; // lanes show a finished race that must not be wiped
     this.running = false;
     this.timer = null;
     this.active = false;
@@ -72,7 +73,8 @@ export class RaceView {
     this.connection.on('complete', mine(lane => this.finishLane(lane)));
     this.connection.on('runError', mine((lane, message) => {
       const error = message.error ?? {};
-      lane.error = error.kind === 'compile' ? 'Does not compile'
+      lane.error = error.kind === 'compile' ? 'Does not compile · open it in Explore to see why'
+        : error.kind === 'unavailable' ? `Could not be built: ${error.message ?? ''}`
         : error.kind === 'timeout' ? 'Stopped: no progress'
           : `Error${Number.isInteger(error.line) ? ` in line ${error.line}` : ''}: ${error.message ?? ''}`;
       this.finishLane(lane);
@@ -105,7 +107,7 @@ export class RaceView {
       }
     }
     this.renderChoices();
-    if (!this.running) this.prepareLanes();
+    if (!this.running && !this.raced) this.prepareLanes();
     else for (const lane of this.lanes) this.renderLane(lane);
     this.renderControls();
   }
@@ -115,6 +117,7 @@ export class RaceView {
     if (this.selected.has(id)) this.selected.delete(id);
     else if (this.selected.size < 4) this.selected.add(id);
     savePreferences({raceSelected: [...this.selected]});
+    this.raced = false;
     this.renderChoices();
     this.prepareLanes();
     this.renderControls();
@@ -125,6 +128,7 @@ export class RaceView {
     this.seed++;
     this.input = makeInput(this.n, this.shape, this.seed);
     $('race-size-output').textContent = String(this.n);
+    this.raced = false;
     this.prepareLanes();
   }
 
@@ -153,7 +157,7 @@ export class RaceView {
     this.lanes = algorithms.map(algorithm => this.createLane(algorithm));
     this.renderLanes();
     this.running = true;
-    this.finishOrder = 0;
+    this.raced = true;
     for (const lane of this.lanes) {
       lane.runId = `race-${++laneCounter}`;
       lane.waiting = true;

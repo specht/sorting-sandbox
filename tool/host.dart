@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'build.dart';
 import 'catalog.dart';
@@ -385,7 +386,10 @@ class Client {
       built = await catalog.ensureBuilt(id);
     } on BuildFailure catch (failure) {
       if (!run.cancelled) {
-        _runError(run, {'kind': 'compile', 'message': failure.message});
+        _runError(run, {
+          'kind': failure.student ? 'compile' : 'unavailable',
+          'message': failure.message,
+        });
       }
       return;
     } catch (error) {
@@ -541,7 +545,8 @@ class Client {
       }
     }
 
-    await Future.wait([lane(), lane()]);
+    final lanes = math.max(2, math.min(6, Platform.numberOfProcessors - 1));
+    await Future.wait([for (var i = 0; i < lanes; i++) lane()]);
     if (!job.cancelled && !closed) send({'type': 'analysisDone', 'jobId': jobId});
     _endJob(job);
   }
@@ -606,7 +611,15 @@ class Client {
         ..remove('requestId');
       return {'revision': revision, 'result': {'status': 'done', ...result}};
     } on BuildFailure catch (failure) {
-      return {'revision': revision, 'result': {'status': 'compile', 'message': failure.message}};
+      return {
+        'revision': revision,
+        'result': {
+          'status': failure.student ? 'compile' : 'crash',
+          'message': failure.student
+              ? failure.message
+              : 'The sandbox could not build this algorithm: ${failure.message}',
+        },
+      };
     } on TimeoutException {
       return {
         'revision': revision,

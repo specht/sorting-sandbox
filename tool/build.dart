@@ -21,7 +21,7 @@ import 'package:crypto/crypto.dart';
 import 'inspect.dart' show AlgorithmMeta;
 import 'instrument_client.dart';
 
-const _cacheVersion = 'sorting-sandbox-worker-v1';
+const _cacheVersion = 'sorting-sandbox-worker-v2';
 const workersDirectory = 'runtime/workers';
 
 class BuiltAlgorithm {

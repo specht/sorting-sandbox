@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:crypto/crypto.dart';
 
@@ -91,7 +92,9 @@ class Catalog {
   final Map<String, AlgorithmFile> files = {};
   final List<String> _queue = [];
   int _activeBuilds = 0;
-  static const _parallelBuilds = 2;
+  /// Background builds (each is one `dart compile kernel` process).
+  static final _parallelBuilds =
+      math.max(1, math.min(4, Platform.numberOfProcessors ~/ 2));
 
   bool get repositoryExists => Directory(repoPath).existsSync();
 
@@ -247,7 +250,7 @@ class Catalog {
             'Fix the marked problems and save again.'
         ..diagnostics = diagnosticList(result['diagnostics']);
       return false;
-    } on InstrumenterUnavailable catch (error) {
+    } catch (error) {
       if (file.revision == revision && file.built == null) {
         file
           ..status = 'error'

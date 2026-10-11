@@ -158,10 +158,15 @@ class InstrumentClient {
         }
         final id = ++_requestId;
         final waiting = Completer<Map<String, dynamic>>();
+        // A failure of the daemon completes every pending request with an
+        // error; one that is not awaited yet must not become uncaught.
+        unawaited(waiting.future.then((_) {}, onError: (Object _) {}));
         _pending[id] = waiting;
         try {
+          // No flush(): many files are checked at once, and concurrent
+          // flushes of one pipe throw "StreamSink is bound to a stream".
+          // The sink delivers buffered lines on its own.
           process.stdin.writeln(jsonEncode({...payload, 'id': id}));
-          await process.stdin.flush();
           final result =
               await waiting.future.timeout(const Duration(seconds: 60));
           if (throwOnStudentError && result['ok'] != true) {
