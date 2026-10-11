@@ -11,8 +11,12 @@ import 'build.dart';
 import 'inspect.dart' show AlgorithmMeta;
 import 'instrument_client.dart';
 
-final studentName = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$');
-final _fileSegment = RegExp(r'^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$');
+// Student folders and file names as they occur in class repositories:
+// letters, digits, '_', '-' and '.', e.g. liu.kashiwabara/ or even a folder
+// called klara_sort.dart/. A segment never starts with '.', so hidden
+// folders, '.' and '..' are excluded.
+final studentName = RegExp(r'^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$');
+final _fileSegment = studentName;
 const maxSourceBytes = 256 * 1024;
 
 String revisionOf(List<int> bytes) =>

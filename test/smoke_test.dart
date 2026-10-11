@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../tool/build.dart';
+import '../tool/catalog.dart';
 import '../tool/host.dart' show WorkerProcess, requestOnce;
 import '../tool/instrument_client.dart';
 import 'harness.dart';
@@ -181,6 +182,38 @@ class Merge extends SortingAlgorithm {
     final check = await requestOnce(built, {'type': 'check', 'requestId': 'c'},
         reply: 'checkResult', timeout: const Duration(seconds: 30));
     expect(check['correct'], isTrue);
+  });
+
+  test('every algorithm of a real class repository is found', () async {
+    final root = Directory.systemTemp.createTempSync('sorting-sandbox-catalog');
+    final files = [
+      'anna/insertionsort.dart', 'inuh_kang/quickSortHoare.dart',
+      'klara_sort.dart/bubble_klara.dart', 'liu.kashiwabara/bubblesort.dart',
+      'Ovilli/insertion-sort.dart', 'sebastian.marhoff/MgSort.dart',
+      'Simon-Cat/QuickestSort.dart', 'HiTears/merge_sort_try.dart',
+    ];
+    for (final file in files) {
+      File('${root.path}/$file')
+        ..createSync(recursive: true)
+        ..writeAsStringSync(File('templates/bubble_sort.dart').readAsStringSync());
+    }
+    for (final ignored in ['README.md', 'pubspec.yaml', '.dart_tool/x/y.dart', 'top_level.dart']) {
+      File('${root.path}/$ignored')
+        ..createSync(recursive: true)
+        ..writeAsStringSync('// not an algorithm');
+    }
+    final catalog = Catalog(
+      repoPath: root.path,
+      builder: builder,
+      instrumenter: instrumenter,
+      onChanged: () {},
+    );
+    catalog.scan();
+    final ids = catalog.files.keys.toSet();
+    expect(ids, {for (final file in files) file.substring(0, file.length - '.dart'.length)});
+    expect(catalog['liu.kashiwabara/bubblesort']!.student, 'liu.kashiwabara');
+    await Future<void>.delayed(const Duration(seconds: 2));
+    root.deleteSync(recursive: true);
   });
 
   test('cleanup', () {

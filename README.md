@@ -128,7 +128,11 @@ Dateinamen an, zum Beispiel:
 ./new-algorithm DEIN_NAME quick_sort
 ```
 
-Vorhandene Dateien werden nie überschrieben.
+Vorhandene Dateien werden nie überschrieben. Mehrere Versionen desselben
+Algorithmus, zum Beispiel eine rekursive und eine iterative, sind einfach
+weitere Dateien in deinem Ordner (etwa `merge_sort.dart` und
+`merge_sort_recursive.dart`). Tragen zwei davon denselben Namen, zeigt die App
+den Dateinamen dahinter an.
 
 Die Datei erscheint nach wenigen Sekunden von selbst in der App. Wähle sie im
 Reiter **Explore** oben in der Algorithmen-Auswahl aus. Links siehst du den

@@ -15,6 +15,7 @@ export class CatalogStore {
   receive(message) {
     const previous = this.byId;
     const algorithms = Array.isArray(message.algorithms) ? message.algorithms : [];
+    disambiguate(algorithms);
     this.byId = new Map(algorithms.map(algorithm => [algorithm.id, algorithm]));
     this.list = sortAlgorithms(algorithms);
     this.exists = message.exists !== false;
@@ -30,6 +31,24 @@ export class CatalogStore {
   onChange(listener) {
     this.listeners.add(listener);
   }
+}
+
+/**
+ * A student may keep several versions of one algorithm (e.g. recursive and
+ * iterative). When two share a name and author, append the file name so
+ * every picker, lane and table row stays distinguishable.
+ */
+export function disambiguate(algorithms) {
+  const key = algorithm => `${String(algorithm.name).trim().toLowerCase()}\u0000${algorithm.author}`;
+  const counts = new Map();
+  for (const algorithm of algorithms) counts.set(key(algorithm), (counts.get(key(algorithm)) ?? 0) + 1);
+  for (const algorithm of algorithms) {
+    if (counts.get(key(algorithm)) > 1) {
+      const file = String(algorithm.path ?? algorithm.id).split('/').pop().replace(/\.dart$/, '');
+      algorithm.name = `${algorithm.name} (${file})`;
+    }
+  }
+  return algorithms;
 }
 
 export const isBusy = algorithm =>

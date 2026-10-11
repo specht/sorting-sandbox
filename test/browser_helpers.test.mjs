@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {compactCount, makeInput, sortAlgorithms, formatList} from '../web/js/util.js';
 import {linearTicks, formatScore} from '../web/js/analyze.js';
 import {stabilityLabels} from '../web/js/explore.js';
+import {disambiguate} from '../web/js/catalog.js';
 
 let passed = 0;
 function test(name, body) {
@@ -55,6 +56,15 @@ test('stability counterexamples label equal values', () => {
   const labels = stabilityLabels([2, 2, 1], [1, 2, 2], [2, 1, 0]);
   assert.deepEqual(labels.input, ['2a', '2b', '1']);
   assert.deepEqual(labels.output, ['1', '2b', '2a']);
+});
+
+test('two versions of one algorithm by the same student stay distinguishable', () => {
+  const list = disambiguate([
+    {id: 'HiTears/merge_sort', path: 'HiTears/merge_sort.dart', name: 'Merge Sort', author: 'HiTears'},
+    {id: 'HiTears/merge_sort_try', path: 'HiTears/merge_sort_try.dart', name: 'Merge Sort', author: 'HiTears'},
+    {id: 'Ovilli/merge-sort', path: 'Ovilli/merge-sort.dart', name: 'Merge Sort', author: 'Ovilli'},
+  ]);
+  assert.deepEqual(list.map(a => a.name), ['Merge Sort (merge_sort)', 'Merge Sort (merge_sort_try)', 'Merge Sort']);
 });
 
 console.log(`${passed} browser helper tests passed.`);

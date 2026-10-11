@@ -23,8 +23,8 @@ if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then usage; exit 0; fi
 if (( $# > 2 )); then usage >&2; exit 64; fi
 
 student="$1"
-if [[ ! "$student" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]]; then
-  echo 'Invalid student folder name (letters, digits, _ and -).' >&2
+if [[ ! "$student" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then
+  echo 'Invalid student folder name (letters, digits, ., _ and -).' >&2
   exit 64
 fi
 if [[ ! -d algorithms ]]; then
