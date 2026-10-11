@@ -29,7 +29,9 @@ tool/
   instrumenter.dart       creates the async "visual" copy with checkpoints
   instrument_daemon.dart  keeps the parser loaded (instrument_client.dart talks to it)
   source_editor.dart      revision-checked browser saves and `dart format`
-web/                      index.html, style.css, js/*.js, vendored CodeMirror/fonts/icons
+  settings.dart           local .settings.yaml (the theme), /api/settings
+  light-theme.mjs         generates web/light.css from web/style.css (Node)
+web/                      index.html, style.css, light.css, js/*.js, vendored CodeMirror/fonts/icons
 templates/                Bubble Sort example and an empty template
 test/                     plain `dart run` / `node` tests (no extra packages)
 ```
@@ -129,3 +131,17 @@ workers and talks to them, and the Node tests for browser helpers.
   (e.g. `list.forEach((x) => helper(x))`) are not transformed; such a file shows
   a clear "visualizer cannot transform" message instead of running.
 - The Android APK of the previous Flutter version is no longer built.
+
+## Light theme
+
+`web/light.css` is generated from `web/style.css`: every rule that sets a color
+is repeated under `:root[data-theme="light"]` with the color mirrored in
+lightness. After changing colors in `style.css`, run
+
+```bash
+node tool/light-theme.mjs web/style.css web/light.css
+```
+
+The choice of theme is stored in `.settings.yaml` (ignored by Git) and written
+into `index.html` by the host. The same script and mechanism are used by the
+CPU and the Data Structure Sandbox.

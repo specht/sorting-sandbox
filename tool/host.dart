@@ -10,6 +10,7 @@ import 'build.dart';
 import 'catalog.dart';
 import 'instrument_client.dart';
 import 'source_editor.dart';
+import 'settings.dart';
 
 const maxElements = 4096;
 const maxValue = 1000000;
@@ -774,6 +775,11 @@ Future<void> _handleRequest(HttpRequest request) async {
       return;
     }
 
+    if (request.uri.path == '/api/settings') {
+      await handleSettings(request);
+      return;
+    }
+
     final response = request.response;
     if (request.method != 'GET' && request.method != 'HEAD') {
       response.statusCode = HttpStatus.methodNotAllowed;
@@ -791,7 +797,11 @@ Future<void> _handleRequest(HttpRequest request) async {
       ..set(HttpHeaders.contentTypeHeader,
           _contentTypes[extension] ?? 'application/octet-stream')
       ..set(HttpHeaders.cacheControlHeader, 'no-store');
-    if (request.method == 'GET') await response.addStream(file.openRead());
+    if (file.path == 'web/index.html') {
+      if (request.method == 'GET') response.write(themedPage(await file.readAsString()));
+    } else if (request.method == 'GET') {
+      await response.addStream(file.openRead());
+    }
     await response.close();
   } catch (error) {
     stderr.writeln('Browser request error: $error');

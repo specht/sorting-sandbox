@@ -103,6 +103,10 @@ Der Browser öffnet sich automatisch (sonst öffne `http://127.0.0.1:8080/`).
 Lasse dieses Terminal geöffnet, solange du mit der App arbeitest. Für die
 Git-Befehle öffnest du ein zweites Terminal.
 
+Der Knopf mit Sonne bzw. Mond oben rechts wechselt zwischen dunklem und hellem
+Design. Die App merkt sich die Wahl in der Datei `.settings.yaml` im
+App-Ordner; Git ignoriert sie, sie landet also in keinem Repository.
+
 ## 6. Deinen Algorithmus hinzufügen
 
 Hole im zweiten Terminal zuerst die neuesten Änderungen der Klasse:

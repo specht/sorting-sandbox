@@ -8,3 +8,5 @@ build/
 
 # Generated, content-addressed workers, caches and UI selections.
 /runtime/
+# Local settings (the theme); they belong to this computer, not to Git.
+.settings.yaml

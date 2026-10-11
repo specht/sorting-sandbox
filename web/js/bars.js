@@ -3,7 +3,9 @@
 // labelled index pointers (i, j, left, right, …).
 import {alpha, mix} from './util.js';
 
-const POINTER = '#7dd3fc';
+// The pointer color follows the theme (--pointer in style.css / light.css).
+const pointerColor = () =>
+  getComputedStyle(document.documentElement).getPropertyValue('--pointer').trim() || '#7dd3fc';
 const READ = '#ffab40';
 const WRITE = '#ff5252';
 const GUTTER = 46;
@@ -18,6 +20,7 @@ export class ArrayCanvas {
     this.scheduled = false;
     this.observer = new ResizeObserver(() => this.schedule());
     this.observer.observe(canvas);
+    window.addEventListener('sandbox-theme', () => this.schedule());
   }
 
   set(patch) {
@@ -47,6 +50,7 @@ export class ArrayCanvas {
     g.setTransform(ratio, 0, 0, ratio, 0, 0);
     g.clearRect(0, 0, width, height);
     const {values, color, reads, writes, variables} = this.state;
+    const POINTER = pointerColor();
     const n = values.length;
     if (!n) return;
     const maxValue = Math.max(1, this.state.maxValue || Math.max(...values));
@@ -111,6 +115,7 @@ export class ArrayCanvas {
   }
 
   drawPointers(g, width, top, n, slot) {
+    const POINTER = pointerColor();
     const byIndex = new Map();
     for (const [name, index] of this.state.variables) {
       if (index < 0 || index > n) continue;

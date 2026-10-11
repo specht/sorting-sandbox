@@ -39,22 +39,23 @@ export class SourceEditor {
       matchBrackets: true, autoCloseBrackets: true, readOnly: 'nocursor', viewportMargin: 20,
       extraKeys: {
         'Ctrl-S': () => this.save(), 'Cmd-S': () => this.save(),
-        'Ctrl-Shift-K': cm => cm.execCommand('deleteLine'),
-        'Cmd-Shift-K': cm => cm.execCommand('deleteLine'),
-        'Alt-Shift-K': cm => cm.execCommand('deleteLine'),
+        // CodeMirror matches key names only in the order Shift-Cmd-Ctrl-Alt.
+        'Shift-Ctrl-K': cm => cm.execCommand('deleteLine'),
+        'Shift-Cmd-K': cm => cm.execCommand('deleteLine'),
+        'Shift-Alt-K': cm => cm.execCommand('deleteLine'),
         'Ctrl-/': cm => this.toggleComment(cm), 'Cmd-/': cm => this.toggleComment(cm),
         'Ctrl-#': cm => this.toggleComment(cm), 'Cmd-#': cm => this.toggleComment(cm),
-        'Ctrl-Shift-7': cm => this.toggleComment(cm),
+        'Shift-Ctrl-7': cm => this.toggleComment(cm),
         'Shift-Alt-F': () => this.format(),
         'Ctrl-Space': cm => this.showSuggestions(cm, true),
         'Tab': cm => (cm.somethingSelected() ? cm.indentSelection('add') : cm.execCommand('insertSoftTab')),
         'Shift-Tab': cm => cm.indentSelection('subtract'),
       },
     });
-    // Chrome may claim Ctrl+Shift+K before CodeMirror's keymap sees it.
-    this.editor.getWrapperElement().addEventListener('keydown', event => {
-      if (!event.ctrlKey || !event.shiftKey || event.altKey || event.metaKey ||
-          event.key?.toLowerCase() !== 'k' || this.editor.getOption('readOnly')) return;
+    // Some browsers claim Ctrl+Shift+K for themselves before the editor sees it.
+    window.addEventListener('keydown', event => {
+      if (!this.editor.hasFocus() || !(event.ctrlKey || event.metaKey) || !event.shiftKey || event.altKey ||
+          (event.code !== 'KeyK' && event.key?.toLowerCase() !== 'k') || this.editor.getOption('readOnly')) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       this.editor.execCommand('deleteLine');

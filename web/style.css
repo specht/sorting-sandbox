@@ -38,7 +38,7 @@ input[type=range]{accent-color:#89baff;cursor:pointer}
 input[type=checkbox]{accent-color:#89baff}
 
 /* ---------------------------------------------------------------- shell */
-.shell{max-width:1800px;margin:auto;min-height:100vh;display:flex;flex-direction:column;padding:0 14px}
+.shell{margin:auto;min-height:100vh;display:flex;flex-direction:column;padding:0 14px}
 .topbar{display:flex;align-items:center;gap:18px;min-height:54px;border-bottom:1px solid var(--border)}
 .brand{display:flex;flex-direction:column;gap:1px;min-width:0}
 .brand strong{font-size:12.5px;letter-spacing:.12em}
@@ -99,9 +99,6 @@ input[type=checkbox]{accent-color:#89baff}
 .source-editor .source-runtime-error-line{background:#6b2c3591}
 .source-editor .source-error-line{background:#5a2d3a70}
 .source-editor .source-error-underline{text-decoration:underline wavy #ff747d 1.5px;text-underline-offset:3px}
-.source-editor .CodeMirror-scroll,.source-editor .CodeMirror-vscrollbar,.source-editor .CodeMirror-hscrollbar{
-  scrollbar-color:#4a627f #101a29;scrollbar-width:thin}
-.source-editor .CodeMirror-scrollbar-filler,.source-editor .CodeMirror-gutter-filler{background:#101a29!important}
 .source-completions{position:absolute;z-index:30;min-width:180px;max-width:300px;max-height:200px;overflow:auto;
   display:flex;flex-direction:column;gap:1px;padding:3px;border:1px solid #567399;border-radius:5px;
   background:#14243a;box-shadow:0 8px 24px #0009}
@@ -118,6 +115,7 @@ input[type=checkbox]{accent-color:#89baff}
 .source-footer{display:flex;align-items:center;gap:10px;min-height:34px;padding:4px 11px;border-top:1px solid #24354b;
   background:#101b2b;font-size:10.5px;color:#94a9c3;flex-wrap:wrap}
 .source-footer button{padding:2px 8px;font-size:10.5px;border-radius:4px;background:#1b2c42}
+.source-shortcuts{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .source-status{margin-left:auto;color:#9bc7ee;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
 .source-status.source-edit-error{color:#ffbdad}
 
@@ -375,3 +373,11 @@ input[type=checkbox]{accent-color:#89baff}
   .size-field input{width:90px}
   .run-status{display:none}
 }
+
+/* Slim blue scrollbars, the same in all sandboxes */
+*{scrollbar-width:thin;scrollbar-color:#3d679f transparent}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-track,::-webkit-scrollbar-corner{background:transparent}
+::-webkit-scrollbar-thumb{background:#3d679f;border:2px solid transparent;border-radius:8px;background-clip:padding-box}
+::-webkit-scrollbar-thumb:hover{background:#5a8dd3;background-clip:padding-box}
+.CodeMirror-scrollbar-filler,.CodeMirror-gutter-filler{background:transparent!important}
