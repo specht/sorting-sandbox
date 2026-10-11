@@ -110,6 +110,11 @@ function renderProblems() {
 $('problems-open').addEventListener('click', () => $('problems-dialog').showModal());
 $('problems-close').addEventListener('click', () => $('problems-dialog').close());
 
+// A click on the backdrop closes a dialog, as in the Data Structure Sandbox.
+for (const dialog of document.querySelectorAll('dialog.app-dialog')) {
+  dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+}
+
 // ------------------------------------------------------------------ start
 
 const initial = location.hash.slice(1);
