@@ -91,44 +91,54 @@ git pull
 
 ## 5. Die App starten
 
-Starte die App in einem Terminal:
+Für die App wird nur das Dart SDK benötigt (kein Flutter). Starte sie in
+einem Terminal:
 
 ```bash
 cd ~/sorting-sandbox
 ./run
 ```
 
-Der Browser öffnet sich automatisch. Lasse dieses Terminal geöffnet, solange
-du mit der App arbeitest. Für deinen Quelltext und die Git-Befehle öffnest du
-ein zweites Terminal.
+Der Browser öffnet sich automatisch (sonst öffne `http://127.0.0.1:8080/`).
+Lasse dieses Terminal geöffnet, solange du mit der App arbeitest. Für die
+Git-Befehle öffnest du ein zweites Terminal.
 
 ## 6. Deinen Algorithmus hinzufügen
 
-Wechsle im zweiten Terminal in das gemeinsame Repository und hole zuerst die
-neuesten Änderungen der Klasse:
+Hole im zweiten Terminal zuerst die neuesten Änderungen der Klasse:
 
 ```bash
 cd ~/sorting-sandbox/algorithms
 git pull
 ```
 
-Unter `algorithms/` bekommt jede Person einen eigenen Ordner. Du kannst das
-vorhandene Beispiel `nh_cham/bubble_sort.dart` als Ausgangspunkt kopieren.
-Ersetze `DEIN_NAME` durch deinen vereinbarten Namen oder Benutzernamen:
+Lege dann im **App-Verzeichnis** deinen eigenen Algorithmus an. Ersetze
+`DEIN_NAME` durch deinen vereinbarten Namen oder Benutzernamen:
 
 ```bash
-mkdir -p DEIN_NAME
-cp nh_cham/bubble_sort.dart DEIN_NAME/bubble_sort.dart
+cd ~/sorting-sandbox
+./new-algorithm DEIN_NAME
 ```
 
-Öffne die kopierte Datei im Editor. Das Beispiel sieht so aus:
+Der Befehl legt `algorithms/DEIN_NAME/bubble_sort.dart` mit einem Bubble Sort
+als Ausgangspunkt an. Für einen weiteren, leeren Algorithmus gibst du einen
+Dateinamen an, zum Beispiel:
+
+```bash
+./new-algorithm DEIN_NAME quick_sort
+```
+
+Vorhandene Dateien werden nie überschrieben.
+
+Die Datei erscheint nach wenigen Sekunden von selbst in der App. Wähle sie im
+Reiter **Explore** oben in der Algorithmen-Auswahl aus. Links siehst du den
+Quelltext und kannst ihn **direkt im Browser bearbeiten**:
 
 ```dart
 import 'package:sorting_sandbox_api/sorting_sandbox_api.dart';
 
 class BubbleSort extends SortingAlgorithm {
   get name => 'Bubble Sort';
-  get author => 'nh_cham';
   get color => Colors.green;
 
   void sort(Elements list, Elements scratch) {
@@ -142,27 +152,54 @@ class BubbleSort extends SortingAlgorithm {
 }
 ```
 
-Ändere mindestens den Autor zu deinem eigenen Namen:
+Du kannst `name`, `color` und natürlich den Sortieralgorithmus ändern. Der
+Autor ist automatisch dein Ordnername. Der Bubble Sort ist absichtlich noch
+nicht optimiert: Untersuche zum Beispiel, ob beide Schleifen wirklich immer so
+weit laufen müssen.
 
-```dart
-get author => 'DEIN_NAME';
-```
+Im Editor gelten diese Tastenkürzel:
 
-Du kannst außerdem `name`, `color` und natürlich den Sortieralgorithmus ändern.
-Der Bubble Sort ist absichtlich noch nicht vollständig optimiert: Später kannst
-du zum Beispiel untersuchen, ob beide Schleifen wirklich immer so weit laufen
-müssen.
+- **Strg+S** speichert die Datei (oder der Knopf **Save**),
+- **Strg+Shift+K** löscht eine Zeile, **Strg+#** kommentiert Zeilen aus,
+- **Format** (bzw. **Shift+Alt+F**) formatiert den Entwurf wie `dart format`,
+- **Revert** verwirft ungespeicherte Änderungen.
 
-Sobald du die Datei speicherst, prüft die laufende App sie automatisch. Bei
-einem Fehler erscheint im Terminal eine Diagnose. Nach der Korrektur taucht
-der Algorithmus ohne Neustart wieder in der App auf.
+Nach dem Speichern prüft und übersetzt die App deinen Code automatisch. Ein
+Fehler wird mit Zeilennummer **unter dem Editor** angezeigt und im Quelltext
+rot unterstrichen; ein Klick auf die Meldung springt zur Zeile. Die
+Visualisierung verwendet immer die zuletzt **gespeicherte** Version. Du kannst
+die Datei auch mit jedem anderen Editor bearbeiten; die App bemerkt das
+Speichern ebenfalls.
+
+### Ausprobieren
+
+- **Run** startet die Animation, **Space** pausiert und setzt fort.
+- **←** und **→** gehen einen Schritt zurück bzw. vor. Mit dem Schieberegler
+  über den Knöpfen springst du zu einem beliebigen früheren Schritt.
+- Die aktuelle Zeile wird im Quelltext hervorgehoben. Unter den Balken stehen
+  deine lokalen Variablen; Variablen wie `i` und `j`, die auf eine Position
+  zeigen, erscheinen zusätzlich als Zeiger unter der Liste.
+- **Highlight reads/writes** markiert, welche Elemente im letzten Schritt
+  gelesen (orange) und geschrieben (rot) wurden.
+- `print(...)` in deinem Algorithmus erscheint in der **Console**. Dort stehen
+  auch Laufzeitfehler (zum Beispiel ein Index außerhalb der Liste) mit der
+  Zeilennummer. Eine Endlosschleife wird nach wenigen Sekunden gestoppt.
+- **Check** testet deinen Algorithmus auf vielen Eingaben und zeigt dir bei
+  einem Fehler die Eingabe, an der er scheitert. Außerdem wird geprüft, ob er
+  stabil ist (gleiche Werte behalten ihre Reihenfolge).
+
+In **Race** treten zwei bis vier Algorithmen mit genau derselben Eingabe
+gegeneinander an. In **Analyze** werden alle Algorithmen der Klasse geprüft
+und ihre Lese-, Schreib- und Vergleichsoperationen für wachsende Eingaben
+verglichen.
 
 ## 7. Deinen Algorithmus veröffentlichen
 
-Bleibe im zweiten Terminal im Verzeichnis
-`~/sorting-sandbox/algorithms`. Prüfe zuerst deine Änderungen:
+Wechsle im zweiten Terminal in das Klassen-Repository und prüfe deine
+Änderungen:
 
 ```bash
+cd ~/sorting-sandbox/algorithms
 git status
 ```
 
@@ -175,7 +212,7 @@ git push
 ```
 
 Nach dem erfolgreichen `push` können alle anderen deinen Algorithmus mit
-`git pull` erhalten.
+`git pull` erhalten. Er erscheint dann ohne Neustart in ihrer App.
 
 Falls der Push mit `rejected` abgelehnt wird, hat wahrscheinlich jemand anderes
 kurz vor dir etwas veröffentlicht. Lösche oder überschreibe dann keine fremden
@@ -197,50 +234,21 @@ cd ..
 Bevor du deinen eigenen Algorithmus bearbeitest, solltest du im Verzeichnis
 `algorithms` immer zuerst `git pull` ausführen.
 
-## 9. Eine Android-APK bauen
-
-Speichere, committe und pushe zuerst deine Arbeit. Beende danach die laufende
-App im ersten Terminal mit Strg+C.
-
-Der APK-Bau benötigt deutlich mehr Arbeitsspeicher und Prozesse als die
-Web-App. Starte deshalb am besten den Workspace neu, bevor du die APK baust.
-Das hilft besonders dann, wenn die App vorher lange gelaufen ist oder ein
-früherer Build wegen fehlender Ressourcen abgebrochen wurde.
-
-Öffne nach dem Neustart ein Terminal, aktualisiere beide Repositories und starte
-den Build:
-
-```bash
-cd ~/sorting-sandbox
-git pull
-cd algorithms
-git pull
-cd ..
-./build-apk
-```
-
-Der Build kann einige Minuten dauern. Die fertige APK enthält den aktuellen
-Stand aller Algorithmen und liegt anschließend hier:
-
-```text
-build/app/outputs/flutter-apk/app-release.apk
-```
-
-Du kannst die Datei im Datei-Explorer des Workspace per Rechtsklick
-herunterladen.
-
 ## Häufige Probleme
 
 - `Permission denied (publickey)`: Prüfe, ob du wirklich den Inhalt von
   `id_ed25519.pub` bei GitLab hinterlegt hast. Teste danach erneut mit
   `ssh -T git@git.nhcham.org`.
-- Dein Algorithmus erscheint nicht: Suche im Terminal mit `./run` nach der
-  Fehlermeldung und korrigiere die genannte Dart-Datei.
+- Dein Algorithmus erscheint nicht: Die Datei muss in einem eigenen Ordner
+  liegen (`algorithms/DEIN_NAME/datei.dart`) und der Dateiname darf nur
+  Buchstaben, Ziffern und `_` enthalten.
+- Oben rechts steht **files with errors**: Ein Klick zeigt alle Dateien der
+  Klasse, die gerade nicht übersetzt werden können. Fremde Dateien mit
+  Fehlern stören deinen eigenen Algorithmus nicht.
+- `Could not listen on 127.0.0.1:8080`: Die App läuft bereits in einem anderen
+  Terminal. Beende sie dort mit Strg+C oder starte mit `./run --port 8081`.
 - `git push` wird abgelehnt: Überschreibe nichts und frage nach Hilfe beim
   Zusammenführen.
-- Der APK-Build scheitert wegen Ressourcen: Beende `./run`, starte den
-  Workspace neu und führe anschließend nur den APK-Build aus.
 
-Die bisherige technische Projektdokumentation steht in
-[DEVELOPMENT.md](DEVELOPMENT.md). Einzelheiten zur Architektur stehen in
-[DESIGN.md](DESIGN.md).
+Die technische Projektdokumentation steht in [DEVELOPMENT.md](DEVELOPMENT.md),
+Einzelheiten zur Architektur in [DESIGN.md](DESIGN.md).

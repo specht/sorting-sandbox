@@ -1,6 +1,6 @@
+import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/ast/visitor.dart';
-import 'package:analyzer/dart/analysis/utilities.dart';
 import 'package:analyzer/source/line_info.dart';
 
 class InstrumentationResult {
@@ -10,6 +10,13 @@ class InstrumentationResult {
   final List<String> errors;
 }
 
+/// Creates the asynchronous "visual" copy of a student algorithm.
+///
+/// Methods and functions become `async`, calls of local helpers are awaited
+/// and a checkpoint is inserted before every statement. The transformation
+/// never inserts line breaks: line N of the generated copy is line N of the
+/// student's file, so compiler errors, stack traces and highlighted source
+/// lines can be reported against the original source.
 class VisualInstrumenter {
   InstrumentationResult instrument(String source, {required String path}) {
     final parsed = parseString(
@@ -29,11 +36,15 @@ class VisualInstrumenter {
     unit.accept(_CallableCollector(callableNames));
 
     final edits = <_Edit>[];
+    // A prefixed import cannot clash with any name the student declares.
     final importOffset = unit.directives.isEmpty ? 0 : unit.directives.last.end;
     edits.add(_Edit.insert(
       importOffset,
-      "\nimport 'dart:async';\n"
-      "import 'package:sorting_sandbox/sandbox_worker_runtime.dart';\n",
+      unit.directives.isEmpty
+          ? "import 'package:sorting_sandbox/sandbox_worker_runtime.dart' "
+              'as __sandbox; '
+          : " import 'package:sorting_sandbox/sandbox_worker_runtime.dart' "
+              'as __sandbox;',
       order: 0,
     ));
 
@@ -57,9 +68,7 @@ class _CallableCollector extends RecursiveAstVisitor<void> {
 
   @override
   void visitMethodDeclaration(MethodDeclaration node) {
-    if (!node.isGetter && !node.isSetter && !node.isOperator) {
-      names.add(node.name.lexeme);
-    }
+    if (_convertibleMethod(node)) names.add(node.name.lexeme);
     super.visitMethodDeclaration(node);
   }
 
@@ -86,7 +95,9 @@ class _AsyncTransformer extends RecursiveAstVisitor<void> {
 
   @override
   void visitFunctionDeclaration(FunctionDeclaration node) {
-    if (!node.isGetter && !node.isSetter) {
+    if (!node.isGetter &&
+        !node.isSetter &&
+        _insideConvertibleExecutable(node.functionExpression.body)) {
       _makeAsync(
         node.returnType,
         node.name.offset,
@@ -108,13 +119,12 @@ class _AsyncTransformer extends RecursiveAstVisitor<void> {
         callableNames.contains(node.methodName.name) &&
         node.thisOrAncestorOfType<AwaitExpression>() == null &&
         _insideConvertibleExecutable(node)) {
-      edits.add(_Edit.insert(node.offset, 'await ', order: 20));
+      // Parenthesized, so `helper().x` and `helper()[i]` keep their meaning.
+      edits.add(_Edit.insert(node.offset, '(await ', order: 20));
+      edits.add(_Edit.insert(node.end, ')', order: 0));
     }
     super.visitMethodInvocation(node);
   }
-
-  bool _convertibleMethod(MethodDeclaration node) =>
-      !node.isGetter && !node.isSetter && !node.isOperator;
 
   void _makeAsync(
     TypeAnnotation? returnType,
@@ -201,17 +211,31 @@ class _CheckpointCollector extends RecursiveAstVisitor<void> {
   }
 
   String _checkpoint(int line, List<String> variables) {
-    final filtered = variables.where((v) => v != 'list' && v != 'scratch').toList();
+    final filtered =
+        variables.where((v) => v != 'list' && v != 'scratch').toList();
     final entries = filtered.map((v) => "'$v': $v").join(', ');
-    return 'await sandboxCheckpoint($line, {$entries});\n';
+    // A trailing space, never a newline: generated line N == student line N.
+    return 'await __sandbox.sandboxCheckpoint($line, {$entries}); ';
   }
 }
 
+/// Members of Object keep their synchronous signatures (an async toString()
+/// would no longer override Object.toString).
+const _objectMembers = {'toString', 'noSuchMethod'};
+
+bool _convertibleMethod(MethodDeclaration node) =>
+    !node.isGetter &&
+    !node.isSetter &&
+    !node.isOperator &&
+    !node.isAbstract &&
+    !_objectMembers.contains(node.name.lexeme);
+
 bool _insideConvertibleExecutable(AstNode node) {
+  // Closures stay synchronous; they cannot contain `await`.
+  final closure = node.thisOrAncestorOfType<FunctionExpression>();
+  if (closure != null && closure.parent is! FunctionDeclaration) return false;
   final method = node.thisOrAncestorOfType<MethodDeclaration>();
-  if (method != null) {
-    return !method.isGetter && !method.isSetter && !method.isOperator;
-  }
+  if (method != null) return _convertibleMethod(method);
   final function = node.thisOrAncestorOfType<FunctionDeclaration>();
   if (function != null) return !function.isGetter && !function.isSetter;
   return false;
@@ -224,6 +248,8 @@ bool _isLoopBody(Block node) {
       (parent is DoStatement && identical(parent.body, node));
 }
 
+/// Locals that can be read safely at [node]: a checkpoint must never read a
+/// `late`, final-without-initializer or non-nullable unassigned variable.
 List<String> _visibleVariablesAt(AstNode node) {
   final result = <String>[];
   final seen = <String>{};
@@ -238,8 +264,9 @@ List<String> _visibleVariablesAt(AstNode node) {
       for (final statement in current.statements) {
         if (statement.offset >= node.offset) break;
         if (statement is VariableDeclarationStatement) {
-          for (final variable in statement.variables.variables) {
-            add(variable.name.lexeme);
+          final list = statement.variables;
+          for (final variable in list.variables) {
+            if (_safeToRead(list, variable)) add(variable.name.lexeme);
           }
         }
       }
@@ -248,14 +275,16 @@ List<String> _visibleVariablesAt(AstNode node) {
     if (current is ForStatement && !identical(current, node)) {
       final parts = current.forLoopParts;
       if (parts is ForPartsWithDeclarations) {
-        for (final variable in parts.variables.variables) {
-          add(variable.name.lexeme);
+        final list = parts.variables;
+        for (final variable in list.variables) {
+          if (_safeToRead(list, variable)) add(variable.name.lexeme);
         }
       }
     }
 
     if (current is MethodDeclaration) {
-      for (final parameter in current.parameters?.parameters ?? const <FormalParameter>[]) {
+      for (final parameter
+          in current.parameters?.parameters ?? const <FormalParameter>[]) {
         add(parameter.name?.lexeme);
       }
       break;
@@ -263,7 +292,8 @@ List<String> _visibleVariablesAt(AstNode node) {
 
     if (current is FunctionDeclaration) {
       for (final parameter
-          in current.functionExpression.parameters?.parameters ?? const <FormalParameter>[]) {
+          in current.functionExpression.parameters?.parameters ??
+              const <FormalParameter>[]) {
         add(parameter.name?.lexeme);
       }
       break;
@@ -273,6 +303,14 @@ List<String> _visibleVariablesAt(AstNode node) {
   }
 
   return result;
+}
+
+bool _safeToRead(VariableDeclarationList list, VariableDeclaration variable) {
+  if (list.isLate) return false;
+  if (variable.initializer != null) return true;
+  if (list.isFinal || list.isConst) return false;
+  final type = list.type;
+  return type == null || type.question != null;
 }
 
 class _Edit {
@@ -298,12 +336,16 @@ String _applyEdits(String source, List<_Edit> edits) {
     inserts.putIfAbsent(edit.offset, () => []).add(edit);
   }
 
-  final allOffsets = <int>{...replacements.map((e) => e.offset), ...inserts.keys}.toList()
+  final allOffsets = <int>{
+    ...replacements.map((e) => e.offset),
+    ...inserts.keys,
+  }.toList()
     ..sort((a, b) => b.compareTo(a));
 
   var out = source;
   for (final offset in allOffsets) {
-    final replacementAtOffset = replacements.where((e) => e.offset == offset).toList();
+    final replacementAtOffset =
+        replacements.where((e) => e.offset == offset).toList();
     if (replacementAtOffset.length > 1) {
       throw StateError('Overlapping replacements at $offset');
     }

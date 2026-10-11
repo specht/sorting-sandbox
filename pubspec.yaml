@@ -1,28 +1,13 @@
 name: sorting_sandbox
 description: A classroom sorting-algorithm visualizer, race arena and analyzer.
 publish_to: none
-version: 2.0.0-dev.1
+version: 3.0.0-dev.1
 
 environment:
   sdk: '>=3.11.0 <4.0.0'
 
 dependencies:
-  flutter:
-    sdk: flutter
-  fl_chart: ^1.2.0
-  web: ^1.1.1
+  analyzer: ^14.1.0
+  crypto: ^3.0.6
   sorting_sandbox_api:
     path: packages/sorting_sandbox_api
-
-dev_dependencies:
-  analyzer: ^14.1.0
-  flutter_lints: ^6.0.0
-  flutter_test:
-    sdk: flutter
-
-flutter:
-  uses-material-design: true
-  fonts:
-    - family: 0xProto Nerd Font Mono
-      fonts:
-        - asset: assets/fonts/0xProtoNerdFontMono-Regular.ttf

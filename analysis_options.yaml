@@ -1,16 +1,4 @@
-include: package:flutter_lints/flutter.yaml
-
-analyzer:
-  exclude:
-    # Generated worker copies are validated before they are moved here.
-    - worker/generated/**
-    # Native copies are generated from the same already-validated sources.
-    - lib/generated/**
-    # Flutter 3.47 upgrades older projects to exclude generated build/platform trees.
-    - build/**
-    - android/**
-    - ios/**
-    - web/**
-    - windows/**
-    - macos/**
-    - linux/**
+# Intentionally no `exclude:` entries for runtime/: after a failed compilation
+# the host runs `dart analyze` on the generated copies there to map errors back
+# to the student's original line numbers. ./check analyzes lib/, tool/, test/
+# and the student API package explicitly.

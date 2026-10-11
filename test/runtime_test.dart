@@ -1,6 +1,8 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:sorting_sandbox/sandbox_worker_runtime.dart';
+import 'package:sorting_sandbox/worker_core.dart';
 import 'package:sorting_sandbox_api/sorting_sandbox_api.dart';
+
+import 'harness.dart';
 
 class StableInsertion extends SortingAlgorithm {
   @override
@@ -35,6 +37,42 @@ class UnstableSelection extends SortingAlgorithm {
       }
       if (min != i) list.swap(i, min);
     }
+  }
+}
+
+/// Sorts only the first two elements: wrong for longer lists.
+class Broken extends SortingAlgorithm {
+  @override
+  String get name => 'Broken';
+  @override
+  String get color => '#000000';
+
+  void sort(Elements list, Elements scratch) {
+    if (list.length >= 2 && list[0] > list[1]) list.swap(0, 1);
+  }
+}
+
+class Throwing extends SortingAlgorithm {
+  @override
+  String get name => 'Throwing';
+  @override
+  String get color => '#000000';
+
+  void sort(Elements list, Elements scratch) {
+    for (var i = 0; i <= list.length; i++) {
+      list[i] = list[i];
+    }
+  }
+}
+
+class Overwriting extends SortingAlgorithm {
+  @override
+  String get name => 'Overwriting';
+  @override
+  String get color => '#000000';
+
+  void sort(Elements list, Elements scratch) {
+    list[0] = list[1];
   }
 }
 
@@ -163,5 +201,49 @@ void main() {
     session.finish();
     expect(frames.last['checkpoint'], 1);
     expect(frames.last['done'], isTrue);
+  });
+
+  test('analysis reports correctness, stability and identical inputs', () {
+    final stable = analyzeAlgorithm(StableInsertion.new, [
+      [3, 1, 2],
+      [5, 4, 3, 2, 1],
+    ]);
+    expect(stable['correct'], isTrue);
+    expect(stable['stable'], isTrue);
+    expect((stable['benchmarks'] as List).length, 2);
+
+    final unstable = analyzeAlgorithm(UnstableSelection.new, const []);
+    expect(unstable['correct'], isTrue);
+    expect(unstable['stable'], isFalse);
+
+    final broken = analyzeAlgorithm(Broken.new, const []);
+    expect(broken['correct'], isFalse);
+    expect(broken['stable'], null);
+  });
+
+  test('the check report names the failing group and input', () {
+    final report = checkAlgorithm(Broken.new);
+    expect(report['correct'], isFalse);
+    final groups = (report['groups'] as List).cast<Map<String, Object?>>();
+    expect(groups.first['ok'], isTrue, reason: 'empty and one-element lists');
+    final failing = groups.firstWhere((group) => group['ok'] != true);
+    final failure = failing['failure'] as Map<String, Object?>;
+    expectContains(failure['message'].toString(), 'not sorted');
+
+    final good = checkAlgorithm(StableInsertion.new);
+    expect(good['correct'], isTrue);
+    expect((good['stability'] as Map)['stable'], isTrue);
+  });
+
+  test('an exception becomes a report with the student line', () {
+    final report = analyzeAlgorithm(Throwing.new, const []);
+    expect(report['correct'], isFalse);
+    final error = report['error'] as Map<String, Object?>;
+    expectContains(error['message'].toString(), 'RangeError');
+  });
+
+  test('overwritten elements are detected through hidden origins', () {
+    final result = runSyncAlgorithm(Overwriting(), [2, 1]);
+    expectContains(judgeResult([2, 1], result) ?? '', 'overwritten');
   });
 }

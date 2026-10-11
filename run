@@ -1,3 +1,51 @@
 #!/usr/bin/env bash
 set -euo pipefail
-exec "$(dirname "$0")/scripts/run.sh" "$@"
+cd "$(dirname "$(realpath "$0")")"
+
+usage() {
+  cat <<'USAGE'
+Usage: ./run [--algorithms PATH] [--port PORT] [--no-open]
+
+Defaults:
+  algorithms: ./algorithms   (a separate, nested Git repository)
+  port:       8080
+
+Starts the Sorting Sandbox in the browser. Student algorithms are compiled
+on demand; saving a file (in the browser or any editor) or `git pull` in
+algorithms/ updates the running app automatically.
+USAGE
+}
+
+for arg in "$@"; do
+  if [[ "$arg" == "-h" || "$arg" == "--help" ]]; then usage; exit 0; fi
+done
+
+if ! command -v dart >/dev/null 2>&1; then
+  echo 'The Dart SDK is required in PATH (https://dart.dev/get-dart).' >&2
+  exit 127
+fi
+
+# Resolve the app's own dependencies only when they changed.
+if [[ ! -f .dart_tool/package_config.json || pubspec.yaml -nt .dart_tool/package_config.json ||
+      ( -f pubspec.lock && pubspec.lock -nt .dart_tool/package_config.json ) ]]; then
+  dart pub get
+fi
+
+# The class repository may carry its own pubspec.yaml so that editors outside
+# the browser can resolve package:sorting_sandbox_api. The app itself does not
+# need it; failures here only affect those external editors.
+algorithms="algorithms"
+for ((i = 1; i <= $#; i++)); do
+  if [[ "${!i}" == "--algorithms" ]]; then
+    next=$((i + 1))
+    algorithms="${!next:-algorithms}"
+  fi
+done
+if [[ -f "$algorithms/pubspec.yaml" ]] &&
+   [[ ! -f "$algorithms/.dart_tool/package_config.json" ||
+      "$algorithms/pubspec.yaml" -nt "$algorithms/.dart_tool/package_config.json" ]]; then
+  (cd "$algorithms" && dart pub get >/dev/null 2>&1) ||
+    echo "Note: 'dart pub get' failed in $algorithms (only external editors need it)." >&2
+fi
+
+exec dart run tool/host.dart "$@"

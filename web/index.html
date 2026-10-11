@@ -1,16 +1,222 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-  <base href="$FLUTTER_BASE_HREF">
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Sorting Sandbox">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#356b39">
-  <title>Sorting Sandbox</title>
-  <link rel="manifest" href="manifest.json">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sorting Sandbox</title>
+<link rel="stylesheet" href="/vendor/codemirror.css">
+<link rel="stylesheet" href="/style.css">
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand"><strong>SORTING SANDBOX</strong><span>Write · watch · race · analyze</span></div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button type="button" role="tab" id="tab-explore" data-view="explore" aria-controls="view-explore" aria-selected="true">
+        <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-sort-ascending"/></svg> Explore</button>
+      <button type="button" role="tab" id="tab-race" data-view="race" aria-controls="view-race" aria-selected="false">
+        <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-flag"/></svg> Race</button>
+      <button type="button" role="tab" id="tab-analyze" data-view="analyze" aria-controls="view-analyze" aria-selected="false">
+        <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-chart-line"/></svg> Analyze</button>
+    </nav>
+    <div class="topright">
+      <button type="button" id="problems-open" class="problems-button" hidden aria-haspopup="dialog" aria-controls="problems-dialog"></button>
+      <span id="connection" class="connection" role="status">Connecting…</span>
+    </div>
+  </header>
+
+  <div id="repository-missing" class="notice" hidden></div>
+
+  <!-- ===================================================== Explore -->
+  <main id="view-explore" class="view workspace" role="tabpanel" aria-labelledby="tab-explore">
+    <section class="code-panel" aria-label="Dart source code">
+      <div class="section-heading">
+        <div class="file-title"><strong id="source-title">No algorithm selected</strong><span id="source-chip" class="source-chip" hidden></span></div>
+        <div class="source-actions">
+          <button type="button" id="source-save" class="save-button" disabled title="Save (Ctrl+S)">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-device-floppy"/></svg> Save</button>
+          <button type="button" id="source-revert" disabled title="Discard unsaved edits">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-refresh"/></svg> Revert</button>
+        </div>
+      </div>
+      <div id="source-editor" class="source-editor" aria-label="Source editor"></div>
+      <section id="source-problems" class="source-problems" aria-label="Problems" hidden>
+        <strong id="source-problem-count">Problems</strong>
+        <ol id="source-problem-list" class="source-problem-list"></ol>
+      </section>
+      <div class="source-footer">
+        <button type="button" id="source-format" disabled title="Format the current draft (Shift+Alt+F)">Format</button>
+        <span class="source-shortcuts">Ctrl+S Save · Ctrl+Shift+K Delete line · Ctrl+# Comment</span>
+        <span id="source-status" class="source-status" role="status" hidden></span>
+      </div>
+    </section>
+
+    <section class="visual-panel" aria-label="Visualization">
+      <div class="visual-toolbar">
+        <div id="explore-picker" class="picker"></div>
+        <label class="field"><span>Input</span><select id="explore-shape"></select></label>
+        <div class="field size-field"><label for="explore-size">n</label>
+          <input type="range" id="explore-size" min="0" max="18" step="1" aria-label="Number of elements">
+          <output id="explore-size-output" for="explore-size">48</output></div>
+        <button type="button" id="explore-shuffle" class="icon-button" title="New input" aria-label="New input">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-arrows-shuffle"/></svg></button>
+        <button type="button" id="explore-check" class="check-button" aria-haspopup="dialog" aria-controls="check-dialog" title="Test this algorithm on many inputs">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-clipboard-check"/></svg> Check <span id="check-summary" class="check-summary" hidden></span></button>
+      </div>
+
+      <div class="arrays">
+        <div class="array-frame array-main">
+          <canvas id="list-canvas" aria-label="List to be sorted"></canvas>
+          <span class="array-label">List to be sorted</span>
+        </div>
+        <div class="stats-row">
+          <span class="stat">Reads <b id="stat-reads">0</b></span>
+          <span class="stat">Writes <b id="stat-writes">0</b></span>
+          <span class="stat">Comparisons <b id="stat-comparisons">0</b></span>
+          <span id="completion-badge" class="completion-badge" hidden></span>
+          <span class="legend"><i class="dot dot-variable"></i>1 variable <i class="dot dot-variables"></i>2+ variables</span>
+          <label class="toggle"><input type="checkbox" id="show-access"> Highlight reads/writes</label>
+          <span id="access-legend" class="legend" hidden><i class="dot dot-read"></i>read <i class="dot dot-write"></i>write</span>
+        </div>
+        <div class="array-frame array-scratch">
+          <canvas id="scratch-canvas" aria-label="Temporary list"></canvas>
+          <span class="array-label">Temporary list</span>
+        </div>
+      </div>
+
+      <div class="variables" aria-label="Local variables">
+        <span class="variables-title">Variables</span>
+        <div id="variables" class="variable-chips"><span class="muted">Run the algorithm to see its local variables.</span></div>
+      </div>
+
+      <section id="console" class="runtime-console" aria-label="Console">
+        <div class="console-toolbar">
+          <button type="button" id="console-toggle" class="console-toggle" aria-expanded="false" aria-controls="console-output">
+            <svg class="ui-icon console-chevron" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-chevron-right"/></svg>
+            <span>Console</span><span id="console-count" class="console-count" hidden></span></button>
+          <span id="console-context" class="console-context">Output of <code>print()</code> and runtime errors appear here.</span>
+          <button type="button" id="console-clear" class="icon-button console-clear" title="Clear console" aria-label="Clear console" disabled>
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-x"/></svg></button>
+        </div>
+        <div id="console-output" class="console-output" role="log" hidden></div>
+      </section>
+
+      <div class="timeline">
+        <div class="timeline-top">
+          <span id="step-label" class="step-label">start</span>
+          <input type="range" id="scrubber" class="scrubber" min="0" max="1" value="0" step="1" aria-label="Execution history" disabled>
+          <span id="run-status" class="run-status" role="status">Ready</span>
+        </div>
+        <div class="controls">
+          <div class="step-controls" role="group" aria-label="Playback">
+            <button type="button" id="step-back" title="Previous step (←)" aria-label="Previous step" disabled>
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-chevron-left"/></svg></button>
+            <button type="button" id="play" class="play-button" title="Run (Space)">
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-player-play"/></svg><span>Run</span></button>
+            <button type="button" id="step-next" title="Next step (→)" aria-label="Next step">
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-chevron-right"/></svg></button>
+            <button type="button" id="stop" title="Stop" aria-label="Stop" disabled>
+              <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-player-stop"/></svg></button>
+          </div>
+          <div class="speed-field"><label for="speed">Speed</label>
+            <input type="range" id="speed" min="0" max="20" step="1" value="8">
+            <output id="speed-output" for="speed">40%</output></div>
+          <span class="keys"><kbd>Space</kbd> run/pause · <kbd>←</kbd> <kbd>→</kbd> step</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===================================================== Race -->
+  <main id="view-race" class="view race" role="tabpanel" aria-labelledby="tab-race" hidden>
+    <section class="panel race-setup">
+      <div class="race-heading"><strong>Choose 2–4 algorithms</strong><span id="race-hint" class="muted">Every lane gets exactly the same input and advances by the same number of steps.</span></div>
+      <div id="race-choices" class="race-choices"></div>
+      <div class="race-controls">
+        <label class="field"><span>Input</span><select id="race-shape"></select></label>
+        <div class="field size-field"><label for="race-size">n</label>
+          <input type="range" id="race-size" min="0" max="14" step="1" aria-label="Number of elements">
+          <output id="race-size-output" for="race-size">48</output></div>
+        <button type="button" id="race-shuffle" class="icon-button" title="New input" aria-label="New input">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-arrows-shuffle"/></svg></button>
+        <div class="speed-field"><label for="race-speed">Speed</label>
+          <input type="range" id="race-speed" min="0" max="20" step="1" value="12">
+          <output id="race-speed-output" for="race-speed">60%</output></div>
+        <button type="button" id="race-start" class="primary">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-flag"/></svg><span>Race</span></button>
+      </div>
+    </section>
+    <section id="race-lanes" class="race-lanes" aria-label="Race lanes"></section>
+  </main>
+
+  <!-- ===================================================== Analyze -->
+  <main id="view-analyze" class="view analyze" role="tabpanel" aria-labelledby="tab-analyze" hidden>
+    <section class="panel analyze-toolbar">
+      <label class="field"><span>Input</span><select id="analyze-shape"></select></label>
+      <label class="field"><span>Show</span><select id="analyze-divisor">
+        <option value="1">score</option>
+        <option value="n">score / n</option>
+        <option value="nlogn">score / (n log₂ n)</option>
+        <option value="n2">score / n²</option>
+      </select></label>
+      <label class="toggle"><input type="checkbox" id="analyze-log-x"> log x</label>
+      <label class="toggle"><input type="checkbox" id="analyze-log-y"> log y</label>
+      <span class="muted analyze-note">score = reads + writes + comparisons</span>
+      <span id="analyze-status" class="analyze-status" role="status"></span>
+      <button type="button" id="analyze-run" class="primary">
+        <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-chart-line"/></svg><span>Analyze all</span></button>
+    </section>
+    <div class="analyze-body">
+      <section class="panel chart-panel" aria-label="Score chart">
+        <div class="chart-head">
+          <strong id="chart-title">Sandbox score</strong>
+          <span class="muted chart-hint">Scroll to zoom · drag to pan · click a line to pin it</span>
+          <button type="button" id="chart-unpin" class="icon-button" title="Unpin" aria-label="Unpin highlighted algorithm" hidden>
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-pin"/></svg></button>
+          <button type="button" id="chart-reset" class="icon-button" title="Reset zoom" aria-label="Reset zoom">
+            <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-focus-centered"/></svg></button>
+        </div>
+        <div class="chart-wrap">
+          <svg id="chart" class="chart" role="img" aria-label="Score by input size"></svg>
+          <div id="chart-tooltip" class="chart-tooltip" hidden></div>
+          <div id="chart-empty" class="chart-empty">Run the class-wide correctness, stability and complexity analysis.</div>
+        </div>
+      </section>
+      <section class="panel results-panel" aria-label="Results">
+        <div id="results" class="results"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- ===================================================== Dialogs -->
+  <dialog id="check-dialog" class="app-dialog check-dialog" aria-labelledby="check-title">
+    <div class="dialog-header">
+      <div><span class="eyebrow">AUTOMATED CHECKS</span><h2 id="check-title">Check algorithm</h2></div>
+      <button type="button" id="check-close" class="icon-button dialog-close" aria-label="Close">
+        <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-x"/></svg></button>
+    </div>
+    <div class="dialog-body">
+      <p id="check-status" class="dialog-status" role="status" aria-live="polite"></p>
+      <ol id="check-results" class="check-results"></ol>
+    </div>
+    <div class="dialog-footer">
+      <p class="dialog-note">Checks run the saved version in a separate process. Passing them does not prove that an algorithm is correct for every input.</p>
+      <div class="dialog-actions"><button type="button" id="check-rerun" class="dialog-primary-action">
+        <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-refresh"/></svg> Run checks again</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="problems-dialog" class="app-dialog problems-dialog" aria-labelledby="problems-title">
+    <div class="dialog-header">
+      <div><span class="eyebrow">CLASS REPOSITORY</span><h2 id="problems-title">Files that cannot be compiled</h2></div>
+      <button type="button" id="problems-close" class="icon-button dialog-close" aria-label="Close">
+        <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-x"/></svg></button>
+    </div>
+    <div class="dialog-body"><ul id="problems-list" class="problems-list"></ul></div>
+    <div class="dialog-footer"><p class="dialog-note">These files are skipped by Race and Analyze until their errors are fixed. Open one to edit it.</p></div>
+  </dialog>
+</div>
+<script src="/vendor/codemirror.js"></script>
+<script type="module" src="/js/app.js"></script>
 </body>
 </html>

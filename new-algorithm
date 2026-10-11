@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$(realpath "$0")")"
+
+usage() {
+  cat <<'EOF'
+Create a new sorting algorithm in the separate class repository.
+
+  ./new-algorithm STUDENT              copy the Bubble Sort example
+  ./new-algorithm STUDENT FILE_NAME    start an empty algorithm
+
+Examples:
+  ./new-algorithm alice                creates algorithms/alice/bubble_sort.dart
+  ./new-algorithm alice quick_sort     creates algorithms/alice/quick_sort.dart
+
+FILE_NAME uses lowercase letters, digits and underscores. An existing file is
+never overwritten. The algorithms/ directory is its own Git repository: commit
+and push your file there.
+EOF
+}
+
+if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then usage; exit 0; fi
+if (( $# > 2 )); then usage >&2; exit 64; fi
+
+student="$1"
+if [[ ! "$student" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]]; then
+  echo 'Invalid student folder name (letters, digits, _ and -).' >&2
+  exit 64
+fi
+if [[ ! -d algorithms ]]; then
+  echo 'algorithms/ does not exist yet. Clone the class repository first:' >&2
+  echo '  git clone <class-repository-url> algorithms' >&2
+  exit 66
+fi
+
+if (( $# == 1 )); then
+  filename="bubble_sort"
+  source="templates/bubble_sort.dart"
+else
+  filename="${2%.dart}"
+  source="templates/empty.dart.tmpl"
+fi
+if [[ ! "$filename" =~ ^[a-z][a-z0-9_]{0,63}$ ]]; then
+  echo 'Invalid file name: use lowercase letters, digits and underscores, e.g. quick_sort.' >&2
+  exit 64
+fi
+
+target="algorithms/$student/$filename.dart"
+if [[ -e "$target" ]]; then
+  echo "File exists; not overwriting: $target" >&2
+  exit 73
+fi
+
+mkdir -p "algorithms/$student"
+if [[ "$source" == "templates/empty.dart.tmpl" ]]; then
+  # quick_sort -> class QuickSort, name 'Quick Sort'
+  class_name="$(echo "$filename" | awk -F_ '{for (i = 1; i <= NF; i++) printf "%s", toupper(substr($i,1,1)) substr($i,2)}')"
+  display_name="$(echo "$filename" | awk -F_ '{for (i = 1; i <= NF; i++) printf "%s%s", (i > 1 ? " " : ""), toupper(substr($i,1,1)) substr($i,2)}')"
+  [[ "$class_name" =~ ^[A-Za-z] ]] || class_name="Algorithm$class_name"
+  sed -e "s/@@CLASS@@/$class_name/" -e "s/@@NAME@@/$display_name/" "$source" > "$target"
+else
+  cp "$source" "$target"
+fi
+echo "Created $target"
+echo "Select it in the browser (Explore → Algorithm) to edit and run it."

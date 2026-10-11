@@ -1,7 +1,7 @@
 # Search practice
 
 Dieses Verzeichnis ist absichtlich ein eigenes kleines Dart-Paket, damit
-`dart run` nicht den `pubspec.yaml` des übergeordneten Flutter-Projekts
+`dart run` nicht den `pubspec.yaml` des übergeordneten Projekts
 `sorting-sandbox` verwendet.
 
 Ausführen:

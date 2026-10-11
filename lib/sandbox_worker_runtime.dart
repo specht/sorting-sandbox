@@ -4,6 +4,9 @@ import 'package:sorting_sandbox_api/sorting_sandbox_api.dart';
 
 CheckpointSession? _activeCheckpointSession;
 
+/// The visual session that generated code is currently reporting to, if any.
+CheckpointSession? get activeCheckpointSession => _activeCheckpointSession;
+
 /// Called only from generated visual code.
 Future<void> sandboxCheckpoint(int line, Map<String, Object?> locals) async {
   final session = _activeCheckpointSession;
@@ -58,10 +61,6 @@ class ProbeState implements OperationProbe {
   final Map<Element, ElementState> _debugStates =
       Map<Element, ElementState>.identity();
 
-  String? readList;
-  int? readIndex;
-  String? writeList;
-  int? writeIndex;
   final Map<String, Set<int>> _reads = {};
   final Map<String, Set<int>> _writes = {};
 
@@ -77,57 +76,29 @@ class ProbeState implements OperationProbe {
   }
 
   @override
-  void onRead(
-    String label,
-    int index,
-    Element element,
-    ElementState value,
-  ) {
+  void onRead(String label, int index, Element element, ElementState value) {
     _debugStates[element] = value;
     metrics.reads++;
-    readList = label;
-    readIndex = index;
     (_reads[label] ??= <int>{}).add(index);
     onOperation();
   }
 
   @override
-  void onWrite(
-    String label,
-    int index,
-    Element element,
-    ElementState value,
-  ) {
+  void onWrite(String label, int index, Element element, ElementState value) {
     _debugStates[element] = value;
     metrics.writes++;
     arrays[label]![index] = value;
-    writeList = label;
-    writeIndex = index;
     (_writes[label] ??= <int>{}).add(index);
     onOperation();
   }
 
-  List<Map<String, Object>> takeReads() {
-    final result = _takeMarkers(_reads);
-    readList = null;
-    readIndex = null;
-    return result;
-  }
+  List<Map<String, Object>> takeReads() => _takeMarkers(_reads);
 
-  List<Map<String, Object>> takeWrites() {
-    final result = _takeMarkers(_writes);
-    writeList = null;
-    writeIndex = null;
-    return result;
-  }
+  List<Map<String, Object>> takeWrites() => _takeMarkers(_writes);
 
   void discardMarkers() {
     _reads.clear();
     _writes.clear();
-    readList = null;
-    readIndex = null;
-    writeList = null;
-    writeIndex = null;
   }
 
   List<Map<String, Object>> _takeMarkers(Map<String, Set<int>> source) {
@@ -150,11 +121,17 @@ class ProbeState implements OperationProbe {
       arrays[label]!.map((e) => e.origin).toList();
 }
 
+/// Cooperative execution of a generated (async) visual algorithm.
+///
+/// Every generated checkpoint consumes one unit of budget. When the budget is
+/// used up, the session emits ONE frame describing the current state and
+/// waits until the host grants more budget. Nothing is recorded: the browser
+/// only ever receives the current state.
 class CheckpointSession {
   CheckpointSession({required this.emitFrame});
 
   final void Function(Map<String, Object?> frame) emitFrame;
-  late final ProbeState probe = ProbeState(onOperation: () {});
+  final ProbeState probe = ProbeState(onOperation: () {});
 
   int _budget = 0;
   Completer<void>? _waiting;
@@ -162,11 +139,6 @@ class CheckpointSession {
   int checkpointIndex = -1;
   Map<String, Object?> currentLocals = const {};
   bool done = false;
-
-  void attachProbe(ProbeState value) {
-    // Kept for a stable call site in worker code. Probe is supplied via getter
-    // in the session factory below; this method intentionally does nothing.
-  }
 
   void addBudget(int amount) {
     if (amount <= 0 || done) return;
@@ -203,6 +175,10 @@ class CheckpointSession {
     await waiter.future;
   }
 
+  /// Emits the current state without waiting, e.g. right before an error
+  /// is reported, so the browser shows the arrays at the moment of failure.
+  void flush() => _emit(done: false);
+
   void finish() {
     done = true;
     _emit(done: true);
@@ -213,34 +189,34 @@ class CheckpointSession {
   void _emit({required bool done}) {
     final list = probe.arrays['list'] ?? const <ElementState>[];
     final scratch = probe.arrays['scratch'] ?? const <ElementState>[];
-    final reads = probe.takeReads();
-    final writes = probe.takeWrites();
     emitFrame({
       'type': 'frame',
       'done': done,
       'line': currentLine,
       'checkpoint': checkpointIndex,
       'locals': currentLocals,
-      'numbers': list.map((e) => e.key).toList(),
-      'scratch': scratch.map((e) => e.key).toList(),
-      'origins': list.map((e) => e.origin).toList(),
+      'numbers': [for (final e in list) e.key],
+      'scratch': [for (final e in scratch) e.key],
       'metrics': probe.metrics.toJson(),
-      'reads': reads,
-      'writes': writes,
-      // Keep singular markers for older app builds during a live worker swap.
-      'read': reads.isEmpty ? null : reads.last,
-      'write': writes.isEmpty ? null : writes.last,
+      'reads': probe.takeReads(),
+      'writes': probe.takeWrites(),
     });
   }
 }
 
+/// Converts a local variable into a small JSON-safe display value.
 Object? _debugValue(Object? value, ProbeState probe) {
-  if (value == null || value is num || value is bool || value is String) {
-    return value;
-  }
+  if (value == null || value is bool || value is int) return value;
+  if (value is double) return value.isFinite ? value : value.toString();
+  if (value is String) return _shorten(value);
   if (value is Element) return probe.debugState(value)?.key ?? 'Element';
-  return value.toString();
+  if (value is Elements) return 'Elements(${value.length})';
+  if (value is List) return 'List(${value.length})';
+  return _shorten(value.toString());
 }
+
+String _shorten(String text) =>
+    text.length <= 48 ? text : '${text.substring(0, 45)}…';
 
 class RunResult {
   RunResult({
@@ -267,8 +243,7 @@ class RunResult {
 }
 
 RunResult runSyncAlgorithm(dynamic algorithm, List<int> values) {
-  late ProbeState probe;
-  probe = ProbeState(onOperation: () {});
+  final probe = ProbeState(onOperation: () {});
   final list = Elements.runtime(
     probe: probe,
     label: 'list',
@@ -287,7 +262,7 @@ RunResult runSyncAlgorithm(dynamic algorithm, List<int> values) {
   final keys = probe.keys('list');
   final origins = probe.origins('list');
   return RunResult(
-    sorted: _isSorted(keys),
+    sorted: isSortedKeys(keys),
     stable: _isStable(keys, origins),
     keys: keys,
     origins: origins,
@@ -295,7 +270,7 @@ RunResult runSyncAlgorithm(dynamic algorithm, List<int> values) {
   );
 }
 
-bool _isSorted(List<int> values) {
+bool isSortedKeys(List<int> values) {
   for (var i = 1; i < values.length; i++) {
     if (values[i - 1] > values[i]) return false;
   }
@@ -303,7 +278,7 @@ bool _isSorted(List<int> values) {
 }
 
 bool _isStable(List<int> keys, List<int> origins) {
-  if (!_isSorted(keys)) return false;
+  if (!isSortedKeys(keys)) return false;
   for (var i = 1; i < keys.length; i++) {
     if (keys[i - 1] == keys[i] && origins[i - 1] > origins[i]) return false;
   }

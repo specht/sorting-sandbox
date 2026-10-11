@@ -1,323 +1,131 @@
-# Sorting Sandbox
+# Sorting Sandbox · development guide
 
-A classroom sorting-algorithm visualizer, race arena and analyzer.
+A classroom sorting-algorithm visualizer, race arena and analyzer that runs in
+the browser and needs only the **Dart SDK** (3.11+). There is no Flutter and no
+build step for the UI: a Dart host serves plain HTML/CSS/JavaScript and runs
+student code in separate Dart worker processes.
 
-The central rule is deliberately strict: **students write normal sorting code**.
-They do not add animation calls, yields, benchmark hooks, stability metadata or
-variable tracing. The sandbox builds those capabilities around their source.
+The central rule is unchanged: **students write ordinary sorting code**. They
+add no animation calls, yields, benchmark hooks, stability metadata or
+variable tracing; the sandbox builds all of that around their source.
 
-## Student-facing algorithm API
-
-A submission still looks like this:
-
-```dart
-import 'package:sorting_sandbox_api/sorting_sandbox_api.dart';
-
-class BubbleSortAnna extends SortingAlgorithm {
-  get name => 'Bubble Sort';
-  get color => Colors.green; // or any '#RRGGBB'
-
-  void sort(Elements list, Elements scratch) {
-    int length = list.length;
-    for (int i = 0; i < length; i++) {
-      for (int j = 0; j < length - i - 1; j++) {
-        if (list[j] > list[j + 1]) list.swap(j, j + 1);
-      }
-    }
-  }
-}
-```
-
-`name` is explicit because a readable name is useful in the UI. `color` is
-chosen by the student. The author is **not** written in the file: it is the
-student directory name.
-
-Students may submit multiple algorithms:
+## Layout
 
 ```text
-algorithms/
-  anna/
-    bubble_sort.dart
-    insertion_sort.dart
-    cocktail_sort.dart
-  ben/
-    merge_sort.dart
-    quick_sort.dart
-  carla/
-    selection_sort.dart
+run                     start the app (dart pub get on demand, then tool/host.dart)
+new-algorithm           create algorithms/STUDENT/NAME.dart from templates/
+update-algorithms       git pull in the nested class repository
+check                   analysis + all tests
+packages/sorting_sandbox_api/   the tiny student-facing API (Elements, Colors, …)
+lib/
+  sandbox_worker_runtime.dart   operation counting, checkpoints, stability
+  worker_core.dart              worker protocol: visual runs, check, analysis
+  worker_process.dart           stdin/stdout loop of a generated worker
+tool/
+  host.dart               HTTP + WebSocket server, runs, checks, analysis jobs
+  catalog.dart            watches algorithms/, per-file status and diagnostics
+  build.dart              content-addressed kernel builds per algorithm revision
+  inspect.dart            parser-only syntax and contract checks (editor positions)
+  instrumenter.dart       creates the async "visual" copy with checkpoints
+  instrument_daemon.dart  keeps the parser loaded (instrument_client.dart talks to it)
+  source_editor.dart      revision-checked browser saves and `dart format`
+web/                      index.html, style.css, js/*.js, vendored CodeMirror/fonts/icons
+templates/                Bubble Sort example and an empty template
+test/                     plain `dart run` / `node` tests (no extra packages)
 ```
 
-Each `.dart` file contains one `SortingAlgorithm` subclass. Helper methods and
-top-level helper functions in the same file are fine.
+`algorithms/` is the class repository, a **separate Git repository** nested in
+the app checkout and ignored by it (not a submodule). Generated workers live in
+the ignored `runtime/workers/` directory.
 
-## Two Git repositories, nested on disk
+## Start
 
-`algorithms/` is intended to be a completely separate class Git repository
-nested inside the application checkout:
+```bash
+./run                         # http://127.0.0.1:8080/
+./run --port 8090 --no-open
+./run --algorithms /some/other/repo
+./run --host 0.0.0.0          # serve other machines (see "Limits" below)
+SANDBOX_PROFILE=1 ./run       # print build timings
+```
+
+The class repository may contain its own `pubspec.yaml` pointing at
+`../packages/sorting_sandbox_api`; `./run` resolves it so that external editors
+(VS Code etc.) understand student files. The app itself does not need it.
+
+## How a save becomes a visualization
 
 ```text
-sorting_sandbox/               # teacher-maintained app repository
-  .git/
-  lib/
-  tool/
-  packages/
-  algorithms/                  # ignored by the outer repository
-    .git/                       # shared class repository
-    anna/
-    ben/
-    carla/
+browser Save (or any editor, or git pull)
+      ↓  catalog notices the new revision (700 ms poll, content hash)
+parser check in the instrument daemon  → name, color, syntax/contract diagnostics
+      ↓  (valid)
+instrument → runtime/workers/<key>/visual.dart   (same line numbers as the original)
+copy       → runtime/workers/<key>/algorithm.dart (byte-identical, for benchmarks)
+generate   → runtime/workers/<key>/worker.dart, compile → worker.dill
+      ↓
+catalog broadcast → editor chip "Ready", Run enabled
 ```
 
-The outer `.gitignore` ignores `/algorithms/`, so the repositories do not
-interfere with each other. This is deliberately **not a Git submodule**.
-
-Typical commands are therefore independent:
-
-```bash
-# Get fixes/features for the sandbox itself.
-git pull
-
-# Get everybody's newest algorithms.
-git -C algorithms pull
-```
-
-For a real class, replace the bundled example `algorithms/` directory with the
-class repository:
-
-```bash
-rm -rf algorithms
-git clone <class-algorithm-repository> algorithms
-```
-
-The class repository's `pubspec.yaml` expects to live at exactly this nested
-location so it can use `../packages/sorting_sandbox_api`.
-
-## Start it
-
-With a current Flutter installation in `PATH`:
-
-```bash
-./run
-```
-
-`./run` does four things:
-
-1. resolves application and algorithm dependencies;
-2. validates/instruments the current algorithms and builds a Web Worker;
-3. builds the Flutter web UI once;
-4. starts a local classroom server **and an algorithm watcher**.
-
-The browser opens at `http://127.0.0.1:8080/` by default.
-
-Useful variants:
-
-```bash
-./run --no-open
-./run --port 8090
-./run --algorithms /some/other/nested/repo
-```
-
-## Build an Android APK
-
-Android uses the same Flutter UI and the same generated algorithm code as the
-web version. The only difference is isolation: browsers use a disposable Web
-Worker, while Android runs each algorithm in a disposable Dart isolate.
-
-With the class repository checked out as `algorithms/`, build an installable
-release APK with:
-
-```bash
-./build-apk
-```
-
-The command validates/instruments the current algorithms, embeds a native
-snapshot, generates an Android host from the **installed Flutter SDK**, and
-runs `flutter build apk --release`. The host lives in ignored `android/` and is
-regenerated on every `./build-apk`, so its Gradle/Android plugin versions stay
-matched to Flutter instead of being frozen in this repository.
-
-The resulting file is:
-
-```text
-build/app/outputs/flutter-apk/app-release.apk
-```
-
-Use `./build-apk` again after changing or pulling algorithms. The optional
-`ANDROID_ORG` environment variable changes the generated Android application
-namespace; it defaults to `de.hackschule`.
-
-## Saving and pulling algorithms is live
-
-While `./run` is running, the watcher observes all student `.dart` files plus
-class-repository configuration files.
-
-A save or `git -C algorithms pull` triggers this pipeline automatically:
-
-```text
-changed student files
-       ↓
-analyze each file independently
-       ↓
-instrument every valid file
-       ↓
-compile a new versioned Web Worker
-       ↓
-atomically publish a new algorithm catalog
-       ↓
-running Flutter app notices the build id
-       ↓
-new runs use the new algorithms
-```
-
-**The Flutter application is not rebuilt or restarted for algorithm edits.**
-It polls only a tiny runtime catalog once per second. The worker file is
-versioned, so a run already in progress can finish on its old worker while the
-next run uses the new build.
-
-If a student saves half-written code with a syntax error, that file is skipped
-and shown as a diagnostic. All other algorithms remain usable. Once the file
-is valid again it reappears automatically.
-
-There is also a convenience command for a normal class pull:
-
-```bash
-./update-algorithms
-```
-
-## No pre-recorded animation
-
-The old Sorting Sandbox ran the complete algorithm first, recorded a long list
-of frames and replayed them later. This rewrite does not.
-
-For each valid source file the tool generates two forms:
-
-- **benchmark form** — the student's original synchronous implementation;
-- **visual form** — a generated async copy with transparent checkpoints.
-
-The original student file is never changed.
-
-The visual form runs in a disposable Web Worker. At a checkpoint it sends only
-the current arrays, counters, source line and local variables to Flutter and
-waits for a new execution budget. This makes single-step, pause, run and stop
-possible without storing the whole execution.
-
-A normal loop that never terminates remains stoppable because it keeps reaching
-generated checkpoints. Code that gets stuck without reaching a checkpoint is
-terminated by a watchdog. Benchmark/analysis jobs run synchronously in their
-own disposable workers and are killed on timeout. Student code therefore
-cannot freeze the Flutter UI.
-
-## Automatic local variables
-
-The source transformer inserts checkpoints such as this in the generated copy:
-
-```dart
-await sandboxCheckpoint(12, {'length': length, 'i': i, 'j': j});
-```
-
-The checked-in student source remains the simple version. `Explore` can show
-`i`, `j`, `left`, `right`, `minimum`, and other lexically visible locals next
-to the highlighted original source line.
-
-## `swap` is only convenience sugar
-
-`list.swap(a, b)` is implemented through exactly the same indexed operations a
-student would write manually:
-
-```dart
-final temp = this[b];
-this[b] = this[a];
-this[a] = temp;
-```
-
-It therefore costs **two reads and two writes**. A unit test explicitly checks
-that `swap()` and the temporary-variable version have identical read/write
-counts. Students are free to use either style.
-
-## Scratch storage always stays visible
-
-Explore and Race always reserve the same amount of vertical space for the main
-list and scratch list. Algorithms that do not use scratch simply leave it
-empty/zeroed. This prevents the primary array from suddenly changing height
-when comparing an in-place algorithm with, for example, Merge Sort.
-
-## Stability without a student-facing feature
-
-Every primary-list element secretly carries its original position. Operators
-compare **only the sort key**, so students do not see or maintain this data.
-After sorting, the analyzer can check whether elements with equal keys kept
-their original relative order.
-
-The UI reports:
-
-- `stable (tested)` when all duplicate-heavy test cases pass;
-- `unstable` when it finds a counterexample;
-- unknown when the algorithm is incorrect or times out.
-
-This is empirical testing, not a mathematical proof, hence the wording
-`stable (tested)`.
-
-## Teaching modes
-
-### Explore
-
-Run one implementation. Both arrays stay visible; reads, writes, comparisons,
-current source line and automatically tracked local variables update live.
-Single-step, pause/continue and Stop operate on the running worker.
-
-### Race
-
-Choose two to four implementations. Every lane receives **the exact same input
-array**. The visualization advances by generated logical checkpoints rather
-than measuring browser CPU speed.
-
-### Analyze
-
-Run every valid class algorithm through correctness cases, duplicate-heavy
-stability cases and identical benchmark inputs. The UI keeps reads, writes and
-comparisons separate and also offers an explicitly artificial classroom score:
-
-```text
-sandbox score = reads + writes + comparisons
-```
-
-Graphs can display raw score or normalize it by `n`, `n log n`, or `n²` so
-students can investigate which growth model tends toward a constant. Input
-shapes include random, sorted, reversed, nearly sorted and few-distinct-values.
-
-## Example class repository in this ZIP
-
-The included `algorithms/` directory is a small ready-to-run example containing
-several algorithms from fictional students, including both `swap()` and a
-manual temporary-variable swap. It intentionally contains no `.git` metadata.
-To turn it into its own repository:
-
-```bash
-git -C algorithms init
-git -C algorithms add .
-git -C algorithms commit -m 'Initial class algorithms'
-```
-
-Or delete it and clone your real class repository into `algorithms/`.
+Every algorithm is compiled **on its own**, so a broken file never affects any
+other algorithm. The cache key covers the source bytes, the Dart SDK version
+and every sandbox file that influences the worker; saving unchanged content,
+restarting `./run` or another browser selecting the same file reuses the
+kernel. Unused builds are pruned at startup after 14 days.
+
+When compilation fails, the host runs `dart analyze` on the generated copies.
+Because `algorithm.dart` is byte-identical and `visual.dart` never inserts line
+breaks, the analyzer's positions are the student's own lines and columns. They
+are shown below the editor and underlined in the source.
+
+## Runs, checks and analysis
+
+Each browser run gets its **own disposable worker process**:
+
+- **Explore / Race**: `visualStart` runs the async copy. Every checkpoint
+  consumes one unit of budget; when the budget is used up the worker sends one
+  frame (arrays, counters, line, locals, read/write markers) and waits for
+  `advance`. Nothing is pre-recorded. Stepping back uses a sparse cache of
+  frames in the browser and, for exact steps, a fresh worker that is
+  fast-forwarded (replayed) to the requested checkpoint.
+- **Check**: correctness groups (empty, tiny, sorted/reversed, duplicates,
+  random, larger inputs), then an empirical stability test. Failures report the
+  input and the wrong result, or the exception with its line.
+- **Analyze**: correctness and stability cases, then the same benchmark inputs
+  for every algorithm (two workers in parallel).
+
+Student `print` output is forwarded to the Console with its source line. An
+exception reports its message, line and the student frames of the stack. A
+run that reaches no checkpoint for 4 seconds is killed (90 seconds while
+replaying to an earlier step); checks and analyses have hard timeouts of 20
+and 12 seconds. A crashed worker never affects the host.
+
+## Browser protocol (WebSocket `/ws`)
+
+Client → host: `readSource`, `saveSource`, `formatSource`, `visualStart`,
+`advance`, `stop`, `check`, `analyze`, `cancel`, `ping`.
+Host → client: `catalog` (all files with status and diagnostics), `sourceFile`,
+`sourceSaved`, `sourceError`, `sourceFormatted`, `sourceFormatError`,
+`runStatus`, `runStarted`, `frame`, `console`, `complete`, `runError`,
+`checkResult`, `analysisResult`, `analysisDone`, `pong`, `error`.
 
 ## Checks
-
-After installing Flutter, run:
 
 ```bash
 ./check
 ```
 
-This runs application analysis/tests, the API package tests, class-repository
-analysis, and a full algorithm preparation/worker compilation pass.
+runs `dart analyze` on `lib`, `tool` and `test`, the API package tests, the
+runtime/instrumenter/parser tests, an end-to-end smoke test that compiles real
+workers and talks to them, and the Node tests for browser helpers.
 
-The most important regression tests cover:
+## Limits
 
-- `swap()` vs manual swapping counts;
-- hidden-origin stability detection;
-- automatic checkpoint/local-variable instrumentation.
-
-## Toolchain
-
-The project targets Dart 3.11+ and currently declares analyzer 14.1, `web` 1.1
-and `fl_chart` 1.2. See `DESIGN.md` for the architecture and worker protocol.
+- Worker processes are **not** OS-level isolation. On a shared host with
+  untrusted users, run the sandbox in a container or with separate filesystem,
+  network and resource restrictions. By default the server listens on
+  `127.0.0.1` only.
+- The visual instrumentation covers ordinary classroom code (methods, top-level
+  helper functions, recursion, loops). Helpers called from inside closures
+  (e.g. `list.forEach((x) => helper(x))`) are not transformed; such a file shows
+  a clear "visualizer cannot transform" message instead of running.
+- The Android APK of the previous Flutter version is no longer built.
