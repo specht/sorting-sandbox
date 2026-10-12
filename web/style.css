@@ -143,9 +143,10 @@ input[type=checkbox]{accent-color:#89baff}
 .picker-option{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:5px;cursor:pointer;font-size:13px}
 .picker-option.active{background:#24406a}
 .picker-option.selected .picker-name{color:#fff}
-.picker-option.selected::after{content:'✓';margin-left:auto;color:var(--blue);padding-left:6px}
+.picker-check{flex:none;width:16px;margin-left:auto;display:inline-flex;justify-content:center;color:var(--blue)}
+.status-icon ~ .picker-check,.level-tag ~ .picker-check{margin-left:2px}
+.picker-check .ui-icon{width:15px;height:15px}
 .picker-option .status-icon{margin-left:auto}
-.picker-option.selected .status-icon{margin-left:6px}
 .picker-empty{padding:10px;color:var(--muted);font-size:12.5px}
 .swatch{display:inline-block;width:11px;height:11px;border-radius:50%;background:var(--swatch);flex:none;
   box-shadow:0 0 0 1px #0006}

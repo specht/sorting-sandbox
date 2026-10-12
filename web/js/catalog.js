@@ -193,6 +193,7 @@ export class AlgorithmPicker {
       el('span', {class: 'picker-author'}, algorithm.author));
       const status = statusIcon(algorithm);
       if (status) option.append(status);
+      option.append(el('span', {class: 'picker-check'}, algorithm.id === this.value ? icon('check') : null));
       return option;
     }));
     if (!this.filtered.length) {

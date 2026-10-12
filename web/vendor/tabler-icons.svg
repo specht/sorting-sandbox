@@ -182,4 +182,19 @@
   <symbol id="ti-moon" viewBox="0 0 24 24">
     <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z"/>
   </symbol>
+  <symbol id="ti-arrow-left" viewBox="0 0 24 24">
+    <path d="M5 12l14 0"/>
+    <path d="M5 12l6 6"/>
+    <path d="M5 12l6 -6"/>
+  </symbol>
+  <symbol id="ti-arrow-up" viewBox="0 0 24 24">
+    <path d="M12 5l0 14"/>
+    <path d="M18 11l-6 -6"/>
+    <path d="M6 11l6 -6"/>
+  </symbol>
+  <symbol id="ti-arrow-down" viewBox="0 0 24 24">
+    <path d="M12 5l0 14"/>
+    <path d="M18 13l-6 6"/>
+    <path d="M6 13l6 6"/>
+  </symbol>
 </svg>
