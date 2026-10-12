@@ -208,6 +208,23 @@
     </div>
   </dialog>
 
+  <dialog id="confirm-dialog" class="app-dialog confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+    <div class="dialog-header">
+      <h2 id="confirm-title">Discard your changes?</h2>
+      <button type="button" id="confirm-close" class="icon-button dialog-close" aria-label="Close">
+        <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-x"/></svg></button>
+    </div>
+    <div class="dialog-body"><p id="confirm-message" class="confirm-message"></p></div>
+    <div class="dialog-footer">
+      <p class="dialog-note" id="confirm-note"></p>
+      <div class="dialog-actions">
+        <button type="button" id="confirm-cancel">Keep editing</button>
+        <button type="button" id="confirm-ok" class="dialog-danger-action">
+          <svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><use href="/vendor/tabler-icons.svg#ti-x"/></svg> <span>Discard</span></button>
+      </div>
+    </div>
+  </dialog>
+
   <dialog id="problems-dialog" class="app-dialog problems-dialog" aria-labelledby="problems-title">
     <div class="dialog-header">
       <h2 id="problems-title">Files that cannot be compiled</h2>

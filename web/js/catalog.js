@@ -93,7 +93,7 @@ export class AlgorithmPicker {
 
     this.button = el('button', {type: 'button', class: 'picker-button', 'aria-haspopup': 'listbox',
       'aria-expanded': 'false', onclick: () => this.toggle()});
-    this.filter = el('input', {type: 'search', class: 'picker-filter', placeholder: 'Filter by name or student…',
+    this.filter = el('input', {type: 'search', class: 'picker-filter', placeholder: 'Filter by name, student or language…',
       'aria-label': 'Filter algorithms', autocomplete: 'off', spellcheck: 'false'});
     this.options = el('div', {class: 'picker-options', role: 'listbox', 'aria-label': 'Algorithms'});
     this.popover = el('div', {class: 'picker-popover', hidden: true}, this.filter, this.options);
@@ -187,10 +187,12 @@ export class AlgorithmPicker {
   }
 
   renderOptions() {
-    const query = this.filter.value.trim().toLowerCase();
-    this.filtered = this.store.list.filter(algorithm => !query ||
-      `${algorithm.name} ${algorithm.author} ${algorithm.id} ${languageOf(algorithm).label}`
-        .toLowerCase().includes(query));
+    // All typed words must match, as in the other sandboxes: "merge python".
+    const words = this.filter.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    this.filtered = this.store.list.filter(algorithm => {
+      const text = `${algorithm.name} ${algorithm.author} ${algorithm.id} ${languageOf(algorithm).label}`.toLowerCase();
+      return words.every(word => text.includes(word));
+    });
     if (this.active >= this.filtered.length) this.active = Math.max(0, this.filtered.length - 1);
     this.options.replaceChildren(...this.filtered.map((algorithm, index) => {
       const option = el('div', {

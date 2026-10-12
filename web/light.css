@@ -161,6 +161,7 @@
 :root[data-theme="light"] .check-error{color:#651f21}
 :root[data-theme="light"] .dialog-footer{background:#dee6f3}
 :root[data-theme="light"] .dialog-primary-action{background:#3f7fd0;border-color:#245ea4}
+:root[data-theme="light"] .dialog-danger-action{background:#db7e70;border-color:#b95041;color:#121212}
 :root[data-theme="light"] .problem-file{background:#cfd9ea}
 :root[data-theme="light"] *{scrollbar-color:#6490cb transparent}
 :root[data-theme="light"] ::-webkit-scrollbar-thumb{background:#6490cb}

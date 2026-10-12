@@ -53,7 +53,7 @@ the ignored `runtime/workers/` directory.
 ## Start
 
 ```bash
-./run                         # http://127.0.0.1:8080/
+./run                         # http://127.0.0.1:8766/
 ./run --port 8090 --no-open
 ./run --algorithms /some/other/repo
 ./run --host 0.0.0.0          # serve other machines (see "Limits" below)

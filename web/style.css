@@ -350,6 +350,9 @@ input[type=checkbox]{accent-color:#89baff}
 .dialog-note{flex:1;margin:0;font-size:11px;color:var(--muted)}
 .dialog-actions{display:flex;gap:8px}
 .dialog-primary-action{background:#3776c7;border-color:#609be6}
+.dialog-danger-action{background:#8f3a2f;border-color:#c45a4a;color:#fff}
+.confirm-dialog{width:min(460px,calc(100vw - 28px))}
+.confirm-message{margin:14px 0;font-size:13.5px;line-height:1.5}
 .problems-list{list-style:none;margin:12px 0;padding:0;display:grid;gap:5px}
 .problem-file{width:100%;display:grid;grid-template-columns:auto auto minmax(0,1fr);align-items:center;gap:9px;text-align:left;
   background:#16243a;font-weight:500}

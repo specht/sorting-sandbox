@@ -8,7 +8,7 @@ Usage: ./run [--algorithms PATH] [--port PORT] [--no-open]
 
 Defaults:
   algorithms: ./algorithms   (a separate, nested Git repository)
-  port:       8080
+  port:       8766
 
 Starts the Sorting Sandbox in the browser. Student algorithms are compiled
 on demand; saving a file (in the browser or any editor) or `git pull` in

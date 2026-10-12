@@ -224,3 +224,35 @@ export function debounceFrame(callback) {
     });
   };
 }
+
+/**
+ * A question in the style of the other dialogs instead of the browser's
+ * confirm() (the same dialog in all three sandboxes): resolves true for the
+ * main action, false for cancel, Esc, × or a click beside the dialog.
+ */
+export function askConfirm({title, message, note = '', ok = 'Discard', cancel = 'Keep editing'}) {
+  const dialog = $('confirm-dialog');
+  $('confirm-title').textContent = title;
+  $('confirm-message').textContent = message;
+  $('confirm-note').textContent = note;
+  $('confirm-ok').querySelector('span').textContent = ok;
+  $('confirm-cancel').textContent = cancel;
+  return new Promise(resolve => {
+    const handlers = [['confirm-ok', () => finish(true)], ['confirm-cancel', () => finish(false)],
+      ['confirm-close', () => finish(false)]];
+    const onClose = () => finish(false);
+    const onBackdrop = event => { if (event.target === dialog) finish(false); };
+    function finish(answer) {
+      dialog.removeEventListener('close', onClose);
+      dialog.removeEventListener('click', onBackdrop);
+      for (const [id, handler] of handlers) $(id).removeEventListener('click', handler);
+      if (dialog.open) dialog.close();
+      resolve(answer);
+    }
+    for (const [id, handler] of handlers) $(id).addEventListener('click', handler);
+    dialog.addEventListener('close', onClose);
+    dialog.addEventListener('click', onBackdrop);
+    dialog.showModal();
+    $('confirm-cancel').focus(); // The safe choice has the focus.
+  });
+}

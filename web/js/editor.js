@@ -1,6 +1,6 @@
 // The browser editor: bundled CodeMirror, revision-checked saves, language-aware
 // formatting and compiler diagnostics on the student's original lines.
-import {el, icon} from './util.js';
+import {askConfirm, el, icon} from './util.js';
 import {LANGUAGES, commentEdits, languageOf} from './languages.js';
 
 export class SourceEditor {
@@ -86,6 +86,7 @@ export class SourceEditor {
       }
       this.updateButtons();
     });
+    // Closing or reloading the tab can only ask with the browser's own prompt.
     window.addEventListener('beforeunload', event => {
       if (!this.dirty) return;
       event.preventDefault();
@@ -105,8 +106,22 @@ export class SourceEditor {
 
   // ------------------------------------------------------------- selection
 
+  /** True when another algorithm may be opened without asking. */
   canLeave() {
-    return !this.saving && (!this.dirty || window.confirm('Discard your unsaved changes to this file?'));
+    return !this.saving && !this.dirty;
+  }
+
+  /** Asks (in the app's own dialog) whether the unsaved draft may be discarded. */
+  async confirmLeave() {
+    if (this.saving) {
+      this.setStatus('Saving… choose again once the file is saved.', true);
+      return false;
+    }
+    if (!this.dirty) return true;
+    const file = this.algorithm?.path?.split('/').pop() ?? 'This file';
+    return askConfirm({title: 'Discard your changes?',
+      message: `${file} has unsaved changes. They will be lost if you open another algorithm now.`,
+      note: 'Save first (Ctrl+S) to keep them.'});
   }
 
   open(algorithm) {
@@ -230,9 +245,14 @@ export class SourceEditor {
     this.setStatus('Saving…');
   }
 
-  revert() {
+  async revert() {
     if (!this.dirty || this.saving || this.revision === null) return;
-    if (!window.confirm('Discard unsaved changes and restore the last saved version?')) return;
+    const id = this.id;
+    const file = this.algorithm?.path?.split('/').pop() ?? 'this file';
+    if (!(await askConfirm({title: 'Revert to the saved version?',
+      message: `Your unsaved changes to ${file} will be lost.`, ok: 'Revert',
+      note: 'Save first (Ctrl+S) to keep them.'}))) return;
+    if (!this.dirty || this.saving || this.revision === null || this.id !== id) return;
     this.write(this.original);
     this.updateDirty();
     if (this.outdated) {

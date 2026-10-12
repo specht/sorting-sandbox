@@ -179,9 +179,21 @@ export class ExploreView {
 
   // -------------------------------------------------------------- selection
 
+  /** Opens [id]; an unsaved draft asks first. Returns whether it opened at once. */
   select(id) {
     if (id === this.algorithmId) return true;
-    if (!this.editor.canLeave()) return false;
+    if (!this.editor.canLeave()) {
+      const draft = this.algorithmId;
+      this.editor.confirmLeave().then(discard => {
+        if (discard && this.algorithmId === draft) this.show(id);
+      });
+      return false;
+    }
+    this.show(id);
+    return true;
+  }
+
+  show(id) {
     this.stop();
     this.algorithmId = id;
     this.preferredId = id;
@@ -193,7 +205,6 @@ export class ExploreView {
     this.console = [];
     this.renderConsole();
     this.render();
-    return true;
   }
 
   catalogChanged() {

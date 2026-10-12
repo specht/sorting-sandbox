@@ -114,7 +114,7 @@ cd ~/sorting-sandbox
 ./run
 ```
 
-Der Browser öffnet sich automatisch (sonst öffne `http://127.0.0.1:8080/`).
+Der Browser öffnet sich automatisch (sonst öffne `http://127.0.0.1:8766/`).
 Lasse dieses Terminal geöffnet, solange du mit der App arbeitest. Für die
 Git-Befehle öffnest du ein zweites Terminal.
 
@@ -367,7 +367,7 @@ Bevor du deinen eigenen Algorithmus bearbeitest, solltest du im Verzeichnis
 - Oben rechts steht **files with errors**: Ein Klick zeigt alle Dateien der
   Klasse, die gerade nicht übersetzt werden können. Fremde Dateien mit
   Fehlern stören deinen eigenen Algorithmus nicht.
-- `Could not listen on 127.0.0.1:8080`: Die App läuft bereits in einem anderen
+- `Could not listen on 127.0.0.1:8766`: Die App läuft bereits in einem anderen
   Terminal. Beende sie dort mit Strg+C oder starte mit `./run --port 8081`.
 - `git push` wird abgelehnt: Überschreibe nichts und frage nach Hilfe beim
   Zusammenführen.
