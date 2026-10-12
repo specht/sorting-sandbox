@@ -227,7 +227,9 @@ bool _convertibleMethod(MethodDeclaration node) =>
     !node.isGetter &&
     !node.isSetter &&
     !node.isOperator &&
-    !node.isAbstract &&
+    // Abstract (and external) methods have no body to convert. Not
+    // `isAbstract`, which newer analyzer versions deprecate.
+    node.body is! EmptyFunctionBody &&
     !_objectMembers.contains(node.name.lexeme);
 
 bool _insideConvertibleExecutable(AstNode node) {

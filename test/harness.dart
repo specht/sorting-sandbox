@@ -5,6 +5,12 @@ import 'dart:io';
 
 final _tests = <(String, FutureOr<void> Function())>[];
 
+/// Thrown by a test that cannot run here (e.g. a toolchain is missing).
+class Skipped implements Exception {
+  Skipped(this.reason);
+  final String reason;
+}
+
 void test(String name, FutureOr<void> Function() body) {
   _tests.add((name, body));
   if (_tests.length == 1) scheduleMicrotask(_run);
@@ -12,18 +18,23 @@ void test(String name, FutureOr<void> Function() body) {
 
 Future<void> _run() async {
   var failed = 0;
+  var skipped = 0;
   for (final (name, body) in _tests) {
     try {
       await body();
       stdout.writeln('  ✓ $name');
+    } on Skipped catch (skip) {
+      skipped++;
+      stdout.writeln('  – $name (skipped: ${skip.reason})');
     } catch (error, stack) {
       failed++;
       stdout.writeln('  ✗ $name\n    $error\n${_indent(stack)}');
     }
   }
+  final skipNote = skipped == 0 ? '' : ', $skipped skipped';
   stdout.writeln(failed == 0
-      ? '${_tests.length} tests passed.'
-      : '$failed of ${_tests.length} tests FAILED.');
+      ? '${_tests.length - skipped} tests passed$skipNote.'
+      : '$failed of ${_tests.length} tests FAILED$skipNote.');
   if (failed > 0) exitCode = 1;
 }
 

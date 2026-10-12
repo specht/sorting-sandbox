@@ -24,17 +24,15 @@ List<int> source(String text) => utf8.encode('$text\n// smoke ${_unique++}\n');
 List<int> pythonSource(String text) => utf8.encode('$text\n# smoke ${_unique++}\n');
 
 /// Tests of a language are skipped (with a note) where its toolchain is missing.
-Future<bool> available(Future<Object?> Function() toolchain) async {
+Future<void> requireToolchain(Future<Object?> Function() toolchain) async {
   try {
     await toolchain();
-    return true;
   } on ToolchainMissing catch (missing) {
-    stdout.writeln('    (skipped: ${missing.message})');
-    return false;
+    throw Skipped(missing.message);
   }
 }
 
-Future<bool> pythonAvailable() => available(pythonToolchain.command);
+Future<void> requirePython() => requireToolchain(pythonToolchain.command);
 
 /// Builds a template of [language] and runs it like the host does: a visual
 /// run to the end, Check and a small Analyze, all judged by lib/judge.dart.
@@ -233,7 +231,7 @@ class Merge extends SortingAlgorithm {
   });
 
   test('a Python algorithm builds, runs step by step and is judged by the host', () async {
-    if (!await pythonAvailable()) return;
+    await requirePython();
     final built = await builder.build(
         pythonSource(File('templates/bubble_sort.py').readAsStringSync()),
         subject: 'smoke/bubble-python',
@@ -262,7 +260,7 @@ class Merge extends SortingAlgorithm {
   });
 
   test('Python problems come back with the line of the student file', () async {
-    if (!await pythonAvailable()) return;
+    await requirePython();
     final syntax = await expectFailure(
         pythonSource('${pythonHeader}class Broken(SortingAlgorithm)\n    name = "B"\n'),
         language: Language.python);
@@ -299,14 +297,14 @@ class Merge extends SortingAlgorithm {
   });
 
   test('Python drafts are formatted by the vendored formatter', () async {
-    if (!await pythonAvailable()) return;
+    await requirePython();
     final reply = await builder.python.format('x.py', 'x=[1,2 ,3]\n');
     expect(reply['ok'], isTrue);
     expect(reply['content'], 'x = [1, 2, 3]\n');
   });
 
   test('a JavaScript algorithm builds, runs step by step and is judged by the host', () async {
-    if (!await available(nodeToolchain.command)) return;
+    await requireToolchain(nodeToolchain.command);
     await templateEndToEnd(Language.javascript);
     final failure = await expectFailure(utf8.encode(File('templates/bubble_sort.js')
         .readAsStringSync()
@@ -319,7 +317,7 @@ class Merge extends SortingAlgorithm {
   });
 
   test('a Java algorithm builds, runs step by step and is judged by the host', () async {
-    if (!await available(javaToolchain.tools)) return;
+    await requireToolchain(javaToolchain.tools);
     await templateEndToEnd(Language.java);
     final failure = await expectFailure(utf8.encode(File('templates/bubble_sort.java')
         .readAsStringSync()
