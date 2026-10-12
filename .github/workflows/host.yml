@@ -8,9 +8,10 @@
 # A version that was built before is not built again.
 name: Precompiled app
 
+# Every push, on every branch: a version that was built before (same key) is
+# skipped in seconds, so only changes of the app itself compile anything.
 on:
   push:
-    branches: [main, master]
   workflow_dispatch:
 
 permissions:
