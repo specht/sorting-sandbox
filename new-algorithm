@@ -3,9 +3,13 @@ set -euo pipefail
 cd "$(dirname "$(realpath "$0")")"
 
 # Languages a student may choose (also works with the bash 3 of macOS).
-languages=(dart python)
-extension_of() { case "$1" in dart) echo dart ;; python) echo py ;; esac; }
-label_of() { case "$1" in dart) echo Dart ;; python) echo Python ;; esac; }
+languages=(dart python javascript java)
+extension_of() {
+  case "$1" in dart) echo dart ;; python) echo py ;; javascript) echo js ;; java) echo java ;; esac
+}
+label_of() {
+  case "$1" in dart) echo Dart ;; python) echo Python ;; javascript) echo JavaScript ;; java) echo Java ;; esac
+}
 
 usage() {
   cat <<'EOF'
@@ -13,13 +17,14 @@ Create a new sorting algorithm in the separate class repository.
 
   ./new-algorithm STUDENT                     copy the Bubble Sort example
   ./new-algorithm STUDENT FILE_NAME           start an empty algorithm
-  ./new-algorithm ... --lang dart|python      choose the language
+  ./new-algorithm ... --lang LANGUAGE         dart, python, javascript (js) or java
 
 Examples:
   ./new-algorithm alice                       algorithms/alice/bubble_sort.dart
   ./new-algorithm alice quick_sort            algorithms/alice/quick_sort.dart
   ./new-algorithm alice quick_sort.py         algorithms/alice/quick_sort.py
   ./new-algorithm alice --lang python         algorithms/alice/bubble_sort.py
+  ./new-algorithm alice heap_sort.java        algorithms/alice/heap_sort.java
 
 Without --lang (or a file extension) the language is, in this order: the
 language you last chose here, the language of your newest file, the language
@@ -154,6 +159,7 @@ if (( ${#positional[@]} == 2 )); then
   fi
 fi
 
+[[ "$chosen" == "js" ]] && chosen="javascript"
 if [[ -n "$chosen" ]]; then
   if ! known_language "$chosen"; then
     echo "Unknown language: $chosen (choose one of: ${languages[*]})." >&2

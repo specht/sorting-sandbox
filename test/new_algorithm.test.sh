@@ -71,4 +71,16 @@ run alice x.py > /dev/null
 if run alice x.py 2> /dev/null; then fail 'overwrote a file'; fi
 ok 'conflicts, unknown languages, bad names and existing files are refused'
 
+fresh
+run alice --lang js > /dev/null
+expect_file algorithms/alice/bubble_sort.js
+run alice heap_sort.java > /dev/null
+expect_file algorithms/alice/heap_sort.java
+grep -q '^class HeapSort extends SortingAlgorithm {$' "$WORK/app/algorithms/alice/heap_sort.java" || fail 'Java class name'
+run bob merge_sort.js > /dev/null
+grep -q '^export default class MergeSort extends SortingAlgorithm {$' "$WORK/app/algorithms/bob/merge_sort.js" || fail 'JS class name'
+out="$(run carl)"
+[[ "$out" == *"JavaScript: your last choice"* ]] || fail "remembered JavaScript: $out"
+ok 'JavaScript and Java templates, with js as a short name'
+
 echo "$passed new-algorithm tests passed."

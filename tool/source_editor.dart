@@ -75,7 +75,7 @@ void checkDraftSize(String content) {
 }
 
 /// Formats a Dart editor draft through stdin. Never writes the student's
-/// file. (Python drafts are formatted by the Python daemon, see host.dart.)
+/// file. (Other languages are formatted by their daemon, see host.dart.)
 Future<String> formatDraft(String sourcePath, String content) async {
   checkDraftSize(content);
   final process = await Process.start(Platform.resolvedExecutable,

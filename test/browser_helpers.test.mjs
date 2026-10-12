@@ -82,6 +82,10 @@ test('versions in different languages are told apart by their file name', () => 
 test('a catalog entry selects its editor language, Dart by default', () => {
   assert.equal(languageOf({language: 'python'}).mode, 'python');
   assert.equal(languageOf({language: 'python'}).indent, 4);
+  assert.equal(languageOf({language: 'java'}).mode, 'text/x-java');
+  assert.equal(languageOf({language: 'javascript'}).comment, '//');
+  assert.equal(fileStem('a/heap_sort.java'), 'heap_sort');
+  assert.equal(fileStem('a/heap_sort.js'), 'heap_sort');
   assert.equal(languageOf({}), LANGUAGES.dart);
   assert.equal(languageOf(null), LANGUAGES.dart);
 });

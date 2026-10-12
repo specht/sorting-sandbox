@@ -3,8 +3,9 @@
 A classroom sorting-algorithm visualizer, race arena and analyzer that runs in
 the browser and needs only the **Dart SDK** (3.11+). There is no Flutter and no
 build step for the UI: a Dart host serves plain HTML/CSS/JavaScript and runs
-student code in separate worker processes. Students write in **Dart or
-Python** (3.10+, only needed by those who choose it); see "Languages" below.
+student code in separate worker processes. Students write in **Dart, Python,
+JavaScript or Java** (Python 3.10+, Node.js 18+ or a JDK 17+ is only needed
+by those who choose it); see "Languages" below.
 
 The central rule is unchanged: **students write ordinary sorting code**. They
 add no animation calls, yields, benchmark hooks, stability metadata or
@@ -14,7 +15,7 @@ variable tracing; the sandbox builds all of that around their source.
 
 ```text
 run                     start the app (dart pub get on demand, then tool/host.dart)
-new-algorithm           create algorithms/STUDENT/NAME.dart|.py from templates/
+new-algorithm           create algorithms/STUDENT/NAME.dart|.py|.js|.java from templates/
 update-algorithms       git pull in the nested class repository
 check                   analysis + all tests
 packages/sorting_sandbox_api/   the tiny student-facing API (Elements, Colors, …)
@@ -31,14 +32,18 @@ tool/
   instrumenter.dart       creates the async "visual" copy with checkpoints
   instrument_daemon.dart  keeps the parser loaded (instrument_client.dart talks to it)
   source_editor.dart      revision-checked browser saves and `dart format`
-  languages.dart          the student languages (by file extension), Python discovery
+  languages.dart          the student languages (by file extension), toolchain discovery
   settings.dart           local .settings.yaml (theme, last chosen language), /api/settings
   light-theme.mjs         generates web/light.css from web/style.css (Node)
 web/                      index.html, style.css, light.css, js/*.js, vendored CodeMirror/fonts/icons
 languages/python/         Python API (sorting_sandbox), worker and check/format daemon
-vendor/python/            vendored pure-Python tools: black, pyflakes (see its README)
+languages/javascript/     JavaScript API (sorting-sandbox.mjs), instrumenter, worker, daemon
+languages/java/src/       Java API (sandbox.sorting) and __sandbox: instrumenter, worker, daemon
+vendor/python/            vendored tools: black, pyflakes (see the READMEs there)
+vendor/javascript/        vendored tools: acorn, eslint-scope, js-beautify
+vendor/java/              vendored google-java-format
 templates/                Bubble Sort example and an empty template per language
-test/                     plain `dart run` / `node` / `python3` / `bash` tests
+test/                     plain `dart run` / `node` / `python3` / `java` / `bash` tests
 ```
 
 `algorithms/` is the class repository, a **separate Git repository** nested in
@@ -115,30 +120,40 @@ and 12 seconds. A crashed worker never affects the host.
 ## Languages
 
 A file's extension is its language (`tool/languages.dart`); the class has no
-language setting and Dart and Python files race each other in one browser.
+language setting, and files of all languages race each other in one browser.
 Catalog ids stay `student/name` for Dart and keep the extension otherwise
-(`student/name.py`). Every language provides the same three pieces:
+(`student/name.py`, `.js`, `.java`). Every language provides the same pieces:
 
-| | Dart | Python |
-| --- | --- | --- |
-| check on save | parser daemon (`tool/instrument_daemon.dart`) | `languages/python/sandbox_daemon.py` (`ast`) |
-| build | instrumented copy + kernel | contract + pyflakes; byte-identical copy |
-| worker | generated kernel (`lib/worker_core.dart`) | `languages/python/sandbox_worker.py` |
-| lines and locals | checkpoints inserted into a copy | `sys.settrace`, no copy needed |
-| Format | `dart format` | vendored `black` in the daemon |
+| | Dart | Python | JavaScript | Java |
+| --- | --- | --- | --- | --- |
+| check on save | `tool/instrument_daemon.dart` | `languages/python/sandbox_daemon.py` | `languages/javascript/sandbox_daemon.mjs` | `__sandbox.Daemon` |
+| build | instrumented copy + kernel | contract + pyflakes; copy | contract + undefined names; two `.mjs` copies | javac: `benchmark/` and `visual/` classes |
+| lines and locals | checkpoints in a copy | `sys.settrace`, no copy | checkpoints in a copy (acorn) | checkpoints in a copy (javac trees) |
+| a checkpoint waits by | `await` (async copy) | blocking on stdin | blocking on stdin (`readSync`) | blocking on stdin |
+| Format | `dart format` | black | js-beautify | google-java-format (AOSP) |
+| time factor | 1 | 3 | 2 | 2 |
 
 All workers speak the same JSON-lines protocol (`visualStart`, `advance`,
-`run`), so the host, the judge and the browser do not know the language. The
-Python API counts operations exactly like the Dart one (`a[i]` one read,
-`a[i] = x` one write, each comparison one comparison, `swap` two reads and two
-writes); negative indices are errors, not wrap-around. Python runs with
-`-I -B` and gets three times the Check/Analyze time limits.
+`run`), so the host, the judge and the browser do not know the language.
+Inserted code never contains line breaks, so stack traces and the editor use
+the student's own lines everywhere. The operation counts are identical:
+one read per element read, one write per element write, one comparison per
+comparison, `swap` = two reads + two writes, negative indices are errors.
+JavaScript and Java compare with `lessThan`, `lessOrEqual`, `greaterThan`,
+`greaterOrEqual` and `equalTo`; Java reads with `get(i)` and writes with
+`set(i, e)`.
 
-Python is found as `$SANDBOX_PYTHON`, `python3`, `python` (or `py -3` on
-Windows) and must be 3.10 or newer. Without it, only `.py` files show an
-explanation. `./new-algorithm` picks the language from `--lang` or the file
-extension, otherwise from the last explicit choice (`language:` in
-`.settings.yaml`), the student's newest file, the class majority, then Dart.
+Toolchains are found once per host: Python as `$SANDBOX_PYTHON`, `python3`,
+`python` (or `py -3`); Node as `$SANDBOX_NODE`, `node`, `nodejs`; the JDK in
+`$SANDBOX_JAVA_HOME/bin`, `$JAVA_HOME/bin` or on the PATH. The Java runtime
+(`languages/java/src`) is compiled with `--release 17` into
+`runtime/java/<hash>/classes` on first use. Without a toolchain, only the files
+of that language show an explanation. Python runs with `-I -B`.
+
+`./new-algorithm` picks the language from `--lang` (`js` is short for
+`javascript`) or the file extension, otherwise from the last explicit choice
+(`language:` in `.settings.yaml`), the student's newest file, the class
+majority, then Dart.
 
 ## Browser protocol (WebSocket `/ws`)
 
@@ -157,9 +172,9 @@ Host → client: `catalog` (all files with status and diagnostics), `sourceFile`
 
 runs `dart analyze` on `lib`, `tool` and `test`, the API package tests, the
 runtime/instrumenter/parser tests, an end-to-end smoke test that compiles real
-workers (Dart and Python) and talks to them, the Python worker/daemon tests
-(when Python 3.10+ is installed), the `new-algorithm` tests and the Node tests
-for browser helpers.
+workers of every installed language and talks to them, the Python, Java and
+JavaScript worker/daemon tests (each when its toolchain is installed), the
+`new-algorithm` tests and the Node tests for browser helpers.
 
 ## Limits
 

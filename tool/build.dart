@@ -1,8 +1,12 @@
 // Content-addressed worker builds: one small kernel per algorithm revision.
 //
-// Dart (the layout below) is compiled. Python needs no build: its directory
-// holds algorithm.py (a byte-identical copy) and ready.json, and the worker
-// is languages/python/sandbox_worker.py run on that copy.
+// Dart (the layout below) is compiled by this file. The other languages are
+// built by their daemon (languages/*/), with the same content-addressed
+// directory and ready.json:
+//
+//   Python      algorithm.py (a byte-identical copy); no instrumented copy
+//   JavaScript  algorithm.mjs and visual.mjs (same lines, runtime import)
+//   Java        benchmark/ and visual/ (classes compiled by the JDK)
 //
 //   runtime/workers/<key>/algorithm.dart   byte-identical copy of the student file
 //   runtime/workers/<key>/visual.dart      instrumented async copy (same line numbers)
@@ -33,7 +37,8 @@ class BuiltAlgorithm {
   BuiltAlgorithm(this.key, this.kernelPath, this.meta, {this.language = Language.dart});
   final String key;
 
-  /// The compiled kernel (Dart) or the copied source file (Python).
+  /// The compiled kernel (Dart), the copied source file (Python) or the build
+  /// directory (JavaScript, Java).
   final String kernelPath;
   final AlgorithmMeta meta;
   final Language language;
@@ -42,9 +47,29 @@ class BuiltAlgorithm {
   Future<List<String>> launchCommand() async => switch (language) {
         Language.python => await pythonToolchain.script(
             'sandbox_worker.py', [File(kernelPath).absolute.path, meta.className]),
+        Language.javascript => await nodeToolchain.script(
+            'sandbox_worker.mjs', [Directory(kernelPath).absolute.path, meta.className]),
+        Language.java =>
+          await javaToolchain.worker(Directory(kernelPath).absolute.path, meta.className),
         _ => [Platform.resolvedExecutable, kernelPath],
       };
 }
+
+/// What [BuiltAlgorithm.kernelPath] is for a build of [language] in
+/// [directory], and whether that build is complete.
+String _entry(String directory, Language language) => switch (language) {
+      Language.python => '$directory/algorithm.py',
+      Language.javascript || Language.java => directory,
+      _ => '$directory/worker.dill',
+    };
+
+bool _complete(String directory, Language language) => switch (language) {
+      Language.javascript => File('$directory/algorithm.mjs').existsSync() &&
+          File('$directory/visual.mjs').existsSync(),
+      Language.java => Directory('$directory/benchmark').existsSync() &&
+          Directory('$directory/visual').existsSync(),
+      _ => File(_entry(directory, language)).existsSync(),
+    };
 
 class BuildFailure implements Exception {
   BuildFailure(this.message, {this.diagnostics = const [], this.student = true});
@@ -69,27 +94,46 @@ void buildProfile(String subject, String stage, Duration duration) {
 }
 
 class WorkerBuilder {
-  WorkerBuilder(this.instrumenter, {InstrumentClient? python})
-      : python = python ??
+  WorkerBuilder(
+    this.instrumenter, {
+    InstrumentClient? python,
+    InstrumentClient? javascript,
+    InstrumentClient? java,
+  })  : python = python ??
             InstrumentClient(
               command: () => pythonToolchain.script('sandbox_daemon.py'),
               label: 'python',
-            );
+            ),
+        javascript = javascript ??
+            InstrumentClient(
+              command: () => nodeToolchain.script('sandbox_daemon.mjs'),
+              label: 'javascript',
+            ),
+        java = java ?? InstrumentClient(command: javaToolchain.daemon, label: 'java');
 
   /// The Dart parser and instrumenter daemon.
   final InstrumentClient instrumenter;
 
-  /// Checks and formats Python sources (languages/python/sandbox_daemon.py).
+  /// Check, build and format the other languages (languages/*/sandbox_daemon.*
+  /// and __sandbox.Daemon for Java).
   final InstrumentClient python;
+  final InstrumentClient javascript;
+  final InstrumentClient java;
 
-  /// The daemon that inspects and formats files of [language].
-  InstrumentClient daemonFor(Language language) =>
-      language == Language.python ? python : instrumenter;
+  /// The daemon that inspects, builds and formats files of [language].
+  InstrumentClient daemonFor(Language language) => switch (language) {
+        Language.python => python,
+        Language.javascript => javascript,
+        Language.java => java,
+        _ => instrumenter,
+      };
 
   /// Stops all daemons (tests; the host keeps them for its whole lifetime).
   void dispose() {
     instrumenter.dispose();
     python.dispose();
+    javascript.dispose();
+    java.dispose();
   }
 
   final _inFlight = <String, Future<BuiltAlgorithm>>{};
@@ -97,7 +141,9 @@ class WorkerBuilder {
 
   String keyFor(List<int> bytes, {Language language = Language.dart}) {
     final data = BytesBuilder(copy: false)
+      // The JavaScript copies refer to the runtime by its absolute path.
       ..add(utf8.encode('$_cacheVersion\u0000${language.id}\u0000'
+          '${Directory.current.absolute.path}\u0000'
           '${Platform.version}\u0000$_toolFingerprint\u0000'))
       ..add(bytes);
     return sha256.convert(data.takeBytes()).toString().substring(0, 32);
@@ -116,14 +162,11 @@ class WorkerBuilder {
         final meta = AlgorithmMeta.fromJson(record['meta']);
         final language = Language.byId(record['language']?.toString() ?? 'dart');
         if (language == null) return null;
-        final kernel = File(language == Language.python
-            ? '$directory/algorithm.py'
-            : '$directory/worker.dill');
-        if (meta == null || !kernel.existsSync()) return null;
+        if (meta == null || !_complete(directory, language)) return null;
         try {
           ready.setLastModifiedSync(DateTime.now()); // Recently used: keep.
         } catch (_) {}
-        return BuiltAlgorithm(key, kernel.path, meta, language: language);
+        return BuiltAlgorithm(key, _entry(directory, language), meta, language: language);
       }
       final failure = record['failure'];
       if (failure is Map) {
@@ -148,9 +191,9 @@ class WorkerBuilder {
     final key = keyFor(bytes, language: language);
     final existing = _inFlight[key];
     if (existing != null) return existing;
-    final future = language == Language.python
-        ? _buildPython(key, bytes, subject)
-        : _build(key, bytes, subject);
+    final future = language == Language.dart
+        ? _build(key, bytes, subject)
+        : _buildWithDaemon(key, bytes, subject, language);
     _inFlight[key] = future;
     // Block body: whenComplete must not wait for the map's (own) future.
     unawaited(future.then((_) {}, onError: (Object _) {}).whenComplete(() {
@@ -264,18 +307,25 @@ class WorkerBuilder {
     );
   }
 
-  /// Python is not compiled: the build checks the contract and runs pyflakes
-  /// (undefined names, …) in the Python daemon and keeps a copy to run.
-  Future<BuiltAlgorithm> _buildPython(String key, List<int> bytes, String subject) async {
+  /// The other languages are built by their daemon: the contract, the
+  /// language's own error checks (pyflakes, undefined names, javac) and the
+  /// copies or classes the worker runs, written into the build directory.
+  Future<BuiltAlgorithm> _buildWithDaemon(
+    String key,
+    List<int> bytes,
+    String subject,
+    Language language,
+  ) async {
     final hit = cached(key);
     if (hit is BuiltAlgorithm) return hit;
     if (hit is BuildFailure) throw hit;
 
     final clock = Stopwatch()..start();
+    stdout.writeln('[build] $subject: building');
     final directory = Directory('$workersDirectory/$key');
     if (directory.existsSync()) directory.deleteSync(recursive: true);
     directory.createSync(recursive: true);
-    final source = File('${directory.path}/algorithm.py')
+    final source = File('${directory.path}/algorithm${language.extension}')
       ..writeAsBytesSync(bytes, flush: true);
 
     final String content;
@@ -285,9 +335,9 @@ class WorkerBuilder {
       throw _record(key, BuildFailure('The file is not valid UTF-8 text.'));
     }
 
-    final Map<String, dynamic> checked;
+    final Map<String, dynamic> built;
     try {
-      checked = await python.instrument(
+      built = await daemonFor(language).instrument(
         source.absolute.path,
         content,
         directory.absolute.path,
@@ -300,15 +350,15 @@ class WorkerBuilder {
     } on InstrumenterUnavailable catch (error) {
       throw BuildFailure(error.message, student: false);
     }
-    final meta = AlgorithmMeta.fromJson(checked['meta']);
-    if (meta == null) {
-      throw BuildFailure('The Python check returned no metadata.', student: false);
+    final meta = AlgorithmMeta.fromJson(built['meta']);
+    if (meta == null || !_complete(directory.path, language)) {
+      throw BuildFailure('The ${language.label} build returned no result.', student: false);
     }
     File('${directory.path}/ready.json').writeAsStringSync(jsonEncode(
-        {'key': key, 'ok': true, 'meta': meta.toJson(), 'language': 'python'}));
-    buildProfile(subject, 'python check', clock.elapsed);
+        {'key': key, 'ok': true, 'meta': meta.toJson(), 'language': language.id}));
+    buildProfile(subject, '${language.id} build', clock.elapsed);
     stdout.writeln('[build] $subject: ready');
-    return BuiltAlgorithm(key, source.path, meta, language: Language.python);
+    return BuiltAlgorithm(key, _entry(directory.path, language), meta, language: language);
   }
 
   BuildFailure _record(String key, BuildFailure failure) {
@@ -397,10 +447,7 @@ String _computeToolFingerprint() {
             .whereType<File>()
             .where((file) => file.path.endsWith('.dart')),
     if (Directory('languages').existsSync())
-      ...Directory('languages')
-          .listSync(recursive: true)
-          .whereType<File>()
-          .where((file) => file.path.endsWith('.py')),
+      ...Directory('languages').listSync(recursive: true).whereType<File>(),
   ]..sort((a, b) => a.path.compareTo(b.path));
   final data = BytesBuilder(copy: false);
   for (final file in files) {

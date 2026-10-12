@@ -23,8 +23,9 @@
     restart.
 15. Students can edit, save and format their file in the browser; errors are
     shown at their own source lines.
-16. Students choose their language (Dart or Python) per file; the teacher
-    sets nothing. All languages are counted, judged and visualized alike.
+16. Students choose their language (Dart, Python, JavaScript or Java) per
+    file; the teacher sets nothing. All languages are counted, judged and
+    visualized alike.
 
 ## Repository boundary
 
@@ -73,8 +74,12 @@ Only the worker and the source checks differ per language. The judge
 (`lib/judge.dart`), the host and the browser see one protocol. Python needs
 neither generated form below: `sys.settrace` delivers each executed line of the
 student's file with its locals (the visual form), and without a tracer the very
-same code runs at full speed (the benchmark form). A checkpoint blocks on stdin
-until the host grants budget; Stop kills the process as for Dart.
+same code runs at full speed (the benchmark form). JavaScript and Java use the
+two forms like Dart, but their checkpoints are synchronous calls inserted on
+the statement's own line (`__sandbox.cp(…)`, `__sandbox.Checkpoint.at(…)`): no
+async transformation is needed, because student code is synchronous and a
+checkpoint can simply block on stdin until the host grants budget. Stop kills
+the process in every language.
 
 ## Two generated execution forms (Dart)
 

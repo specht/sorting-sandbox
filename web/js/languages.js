@@ -17,11 +17,31 @@ const PYTHON_KEYWORDS = ['and', 'as', 'assert', 'break', 'class', 'continue', 'd
   // Sorting Sandbox API
   'Elements', 'Element', 'SortingAlgorithm', 'Colors', 'swap', 'scratch', 'elements'];
 
+const JAVASCRIPT_KEYWORDS = ['break', 'case', 'catch', 'class', 'const', 'continue', 'default',
+  'do', 'else', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if', 'import',
+  'in', 'let', 'new', 'null', 'of', 'return', 'static', 'super', 'switch', 'this', 'throw',
+  'true', 'try', 'typeof', 'undefined', 'while', 'console', 'Math',
+  // Sorting Sandbox API
+  'Elements', 'Element', 'SortingAlgorithm', 'Colors', 'length', 'swap', 'scratch',
+  'lessThan', 'lessOrEqual', 'greaterThan', 'greaterOrEqual', 'equalTo'];
+
+const JAVA_KEYWORDS = ['boolean', 'break', 'case', 'catch', 'class', 'continue', 'default',
+  'do', 'double', 'else', 'extends', 'false', 'final', 'finally', 'for', 'if', 'import', 'int',
+  'long', 'new', 'null', 'private', 'public', 'return', 'static', 'String', 'super', 'switch',
+  'this', 'throw', 'true', 'try', 'var', 'void', 'while', 'System', 'Math',
+  // Sorting Sandbox API
+  'Elements', 'Element', 'SortingAlgorithm', 'Colors', 'length', 'get', 'set', 'swap', 'scratch',
+  'lessThan', 'lessOrEqual', 'greaterThan', 'greaterOrEqual', 'equalTo'];
+
 export const LANGUAGES = {
   dart: {id: 'dart', label: 'Dart', extension: '.dart', mode: 'dart', indent: 2, comment: '//',
     keywords: DART_KEYWORDS},
   python: {id: 'python', label: 'Python', extension: '.py', mode: 'python', indent: 4, comment: '#',
     keywords: PYTHON_KEYWORDS},
+  javascript: {id: 'javascript', label: 'JavaScript', extension: '.js', mode: 'javascript', indent: 2,
+    comment: '//', keywords: JAVASCRIPT_KEYWORDS},
+  java: {id: 'java', label: 'Java', extension: '.java', mode: 'text/x-java', indent: 4, comment: '//',
+    keywords: JAVA_KEYWORDS},
 };
 
 /** The language of a catalog entry (Dart for entries of older hosts). */

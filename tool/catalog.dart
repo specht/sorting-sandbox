@@ -141,9 +141,8 @@ class Catalog {
             .substring(0, segments.last.length - language.extension.length);
         final stems = [...segments.sublist(0, segments.length - 1), stem];
         if (!stems.every(_fileSegment.hasMatch)) continue;
-        // Python caches and virtual environments are never algorithms.
-        if (segments.any((segment) => segment == '__pycache__' ||
-            segment == 'venv' || segment == 'site-packages')) {
+        // Caches, virtual environments and packages are never algorithms.
+        if (segments.any(const {'__pycache__', 'venv', 'site-packages', 'node_modules'}.contains)) {
           continue;
         }
         final id = language == Language.dart

@@ -23,15 +23,46 @@ var _unique = DateTime.now().microsecondsSinceEpoch;
 List<int> source(String text) => utf8.encode('$text\n// smoke ${_unique++}\n');
 List<int> pythonSource(String text) => utf8.encode('$text\n# smoke ${_unique++}\n');
 
-/// Python tests are skipped (with a note) where no Python 3.10+ is installed.
-Future<bool> pythonAvailable() async {
+/// Tests of a language are skipped (with a note) where its toolchain is missing.
+Future<bool> available(Future<Object?> Function() toolchain) async {
   try {
-    await pythonToolchain.command();
+    await toolchain();
     return true;
   } on ToolchainMissing catch (missing) {
     stdout.writeln('    (skipped: ${missing.message})');
     return false;
   }
+}
+
+Future<bool> pythonAvailable() => available(pythonToolchain.command);
+
+/// Builds a template of [language] and runs it like the host does: a visual
+/// run to the end, Check and a small Analyze, all judged by lib/judge.dart.
+Future<void> templateEndToEnd(Language language) async {
+  final template = File('templates/bubble_sort${language.extension}').readAsStringSync();
+  final built = await builder.build(
+      utf8.encode('$template\n${language == Language.python ? '#' : '//'} smoke ${_unique++}\n'),
+      subject: 'smoke/bubble-${language.id}',
+      language: language);
+  expect(built.meta.name, 'Bubble Sort');
+  expect(built.language, language);
+  final run = await runVisual(built, [3, 1, 2]);
+  expect(run.error, null);
+  expect(run.frames.last['numbers'], [1, 2, 3]);
+  expect((run.frames.last['metrics'] as Map)['comparisons'], 6,
+      reason: 'the same count as the Dart template');
+  final check = await judgeInWorker(built, checkCases, timeout: const Duration(seconds: 60));
+  expect(check['correct'], isTrue);
+  expect((check['stability'] as Map)['stable'], isTrue);
+  final analysis = await judgeInWorker(
+      built,
+      (run) => analyzeCases(run, [
+            [4, 3, 2, 1],
+            [2, 1],
+          ]),
+      timeout: const Duration(seconds: 60));
+  expect(analysis['correct'], isTrue);
+  expect((analysis['benchmarks'] as List).length, 2);
 }
 
 const pythonHeader = 'from sorting_sandbox import Colors, Elements, SortingAlgorithm\n\n\n';
@@ -274,6 +305,32 @@ class Merge extends SortingAlgorithm {
     expect(reply['content'], 'x = [1, 2, 3]\n');
   });
 
+  test('a JavaScript algorithm builds, runs step by step and is judged by the host', () async {
+    if (!await available(nodeToolchain.command)) return;
+    await templateEndToEnd(Language.javascript);
+    final failure = await expectFailure(utf8.encode(File('templates/bubble_sort.js')
+        .readAsStringSync()
+        .replaceFirst('const length = list.length;', 'const length = list.lenght + missing;')),
+        language: Language.javascript);
+    expect(failure.diagnostics.first['line'], 8);
+    expectContains(failure.diagnostics.first['message'].toString(), 'missing');
+    final reply = await builder.javascript.format('x.js', 'function f(){return 1}\n');
+    expect(reply['content'], 'function f() {\n  return 1\n}\n');
+  });
+
+  test('a Java algorithm builds, runs step by step and is judged by the host', () async {
+    if (!await available(javaToolchain.tools)) return;
+    await templateEndToEnd(Language.java);
+    final failure = await expectFailure(utf8.encode(File('templates/bubble_sort.java')
+        .readAsStringSync()
+        .replaceFirst('int length = list.length;', 'int length = list.lenght;')),
+        language: Language.java);
+    expect(failure.diagnostics.first['line'], 8);
+    expectContains(failure.diagnostics.first['message'].toString(), 'lenght');
+    final reply = await builder.java.format('x.java', 'class A{void f(){}}\n');
+    expect(reply['content'], 'class A {\n    void f() {}\n}\n');
+  });
+
   test('every algorithm of a real class repository is found', () async {
     final root = Directory.systemTemp.createTempSync('sorting-sandbox-catalog');
     final files = [
@@ -281,7 +338,7 @@ class Merge extends SortingAlgorithm {
       'klara_sort.dart/bubble_klara.dart', 'liu.kashiwabara/bubblesort.dart',
       'Ovilli/insertion-sort.dart', 'sebastian.marhoff/MgSort.dart',
       'Simon-Cat/QuickestSort.dart', 'HiTears/merge_sort_try.dart',
-      'anna/quick_sort.py', 'bob/merge_sort.py',
+      'anna/quick_sort.py', 'bob/merge_sort.py', 'carl/heap_sort.js', 'dora/HeapSort.java',
     ];
     for (final file in files) {
       File('${root.path}/$file')
@@ -289,7 +346,8 @@ class Merge extends SortingAlgorithm {
         ..writeAsStringSync(File('templates/bubble_sort.dart').readAsStringSync());
     }
     for (final ignored in ['README.md', 'pubspec.yaml', '.dart_tool/x/y.dart', 'top_level.dart',
-        'top_level.py', 'anna/.venv/lib/x.py', 'anna/__pycache__/x.py', 'anna/notes.txt']) {
+        'top_level.py', 'anna/.venv/lib/x.py', 'anna/__pycache__/x.py', 'anna/notes.txt',
+        'carl/node_modules/x/index.js', 'carl/data.json']) {
       File('${root.path}/$ignored')
         ..createSync(recursive: true)
         ..writeAsStringSync('// not an algorithm');
@@ -310,6 +368,8 @@ class Merge extends SortingAlgorithm {
     expect(catalog['anna/quick_sort.py']!.language, Language.python);
     expect(catalog['anna/quick_sort.py']!.toJson()['language'], 'python');
     expect(catalog['anna/quick_sort.py']!.displayName, 'Quick Sort');
+    expect(catalog['carl/heap_sort.js']!.language, Language.javascript);
+    expect(catalog['dora/HeapSort.java']!.language, Language.java);
     await Future<void>.delayed(const Duration(seconds: 2));
     root.deleteSync(recursive: true);
   });

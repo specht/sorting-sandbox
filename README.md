@@ -1,9 +1,9 @@
 # Sorting Sandbox
 
-Mit der Sorting Sandbox könnt ihr Sortieralgorithmen in Dart oder Python
-schreiben, beobachten, vergleichen und untersuchen. Jede und jeder wählt die
-Sprache selbst; Algorithmen in verschiedenen Sprachen treten in derselben App
-gegeneinander an.
+Mit der Sorting Sandbox könnt ihr Sortieralgorithmen in Dart, Python,
+JavaScript oder Java schreiben, beobachten, vergleichen und untersuchen. Jede
+und jeder wählt die Sprache selbst; Algorithmen in verschiedenen Sprachen
+treten in derselben App gegeneinander an.
 
 ## Was liegt wo?
 
@@ -93,9 +93,11 @@ git pull
 
 ## 5. Die App starten
 
-Für die App wird nur das Dart SDK benötigt (kein Flutter). Wer in Python
-schreibt, braucht zusätzlich Python 3.10 oder neuer (`python3 --version`);
-alles Weitere bringt die App mit. Starte sie in einem Terminal:
+Für die App wird nur das Dart SDK benötigt (kein Flutter). Für die anderen
+Sprachen braucht dein Computer zusätzlich deren Interpreter bzw. Compiler:
+Python 3.10 oder neuer (`python3 --version`), Node.js 18 oder neuer
+(`node --version`) bzw. ein JDK 17 oder neuer (`javac -version`). Alles
+Weitere bringt die App mit. Starte sie in einem Terminal:
 
 ```bash
 cd ~/sorting-sandbox
@@ -141,13 +143,15 @@ weitere Dateien in deinem Ordner (etwa `merge_sort.dart` und
 `merge_sort_recursive.dart`). Tragen zwei davon denselben Namen, zeigt die App
 den Dateinamen dahinter an.
 
-### Dart oder Python?
+### Dart, Python, JavaScript oder Java?
 
 Die Sprache wählst du mit `--lang` oder einfach über die Dateiendung:
 
 ```bash
 ./new-algorithm DEIN_NAME --lang python        # bubble_sort.py
 ./new-algorithm DEIN_NAME quick_sort.py        # leerer Algorithmus in Python
+./new-algorithm DEIN_NAME --lang js            # bubble_sort.js
+./new-algorithm DEIN_NAME heap_sort.java       # leerer Algorithmus in Java
 ./new-algorithm DEIN_NAME quick_sort --lang dart
 ```
 
@@ -196,11 +200,62 @@ class BubbleSort(SortingAlgorithm):
                     elements.swap(j, j + 1)
 ```
 
-In beiden Sprachen zählen Lesen (`elements[i]`), Schreiben
-(`elements[i] = x`) und Vergleichen (`<`, `<=`, `>`, `>=`, `==`) genau gleich;
-`swap` sind zwei Lese- und zwei Schreibzugriffe. In Python sind negative
-Indizes wie `elements[-1]` ein Fehler (wie in Dart) und keine Abkürzung für
-das letzte Element.
+In JavaScript:
+
+```javascript
+import { Colors, SortingAlgorithm } from "sorting-sandbox";
+
+export default class BubbleSort extends SortingAlgorithm {
+  name = "Bubble Sort";
+  color = Colors.green;
+
+  sort(list, scratch) {
+    const length = list.length;
+    for (let i = 0; i < length; i++) {
+      for (let j = 0; j < length - 1; j++) {
+        if (list[j].greaterThan(list[j + 1])) list.swap(j, j + 1);
+      }
+    }
+  }
+}
+```
+
+In Java (die Datei heißt `bubble_sort.java`, die Klasse trotzdem
+`BubbleSort`):
+
+```java
+import sandbox.sorting.*;
+
+class BubbleSort extends SortingAlgorithm {
+    String name = "Bubble Sort";
+    String color = Colors.GREEN;
+
+    public void sort(Elements list, Elements scratch) {
+        int length = list.length;
+        for (int i = 0; i < length; i++) {
+            for (int j = 0; j < length - 1; j++) {
+                if (list.get(j).greaterThan(list.get(j + 1))) list.swap(j, j + 1);
+            }
+        }
+    }
+}
+```
+
+In allen Sprachen wird genau gleich gezählt: Jedes Lesen eines Elements,
+jedes Schreiben und jeder Vergleich zählt eins; `swap` sind zwei Lese- und
+zwei Schreibzugriffe. Nur die Schreibweise unterscheidet sich:
+
+| | Dart, Python | JavaScript | Java |
+| --- | --- | --- | --- |
+| lesen | `list[i]` | `list[i]` | `list.get(i)` |
+| schreiben | `list[i] = x` | `list[i] = x` | `list.set(i, x)` |
+| vergleichen | `a < b`, `a <= b`, `a > b`, `a >= b`, `a == b` | `a.lessThan(b)`, `a.lessOrEqual(b)`, `a.greaterThan(b)`, `a.greaterOrEqual(b)`, `a.equalTo(b)` | wie JavaScript |
+| Länge | `list.length` (Python: `len(list)`) | `list.length` | `list.length` |
+
+JavaScript und Java können `<` nicht für eigene Objekte definieren, deshalb
+gibt es dort Methoden; `a < b` mit zwei Elementen ist in JavaScript ein Fehler.
+Negative Indizes wie `elements[-1]` sind in allen Sprachen ein Fehler und
+keine Abkürzung für das letzte Element.
 
 Du kannst `name`, `color` und natürlich den Sortieralgorithmus ändern. Der
 Autor ist automatisch dein Ordnername. Der Bubble Sort ist absichtlich noch
@@ -211,8 +266,9 @@ Im Editor gelten diese Tastenkürzel:
 
 - **Strg+S** speichert die Datei (oder der Knopf **Save**),
 - **Strg+Shift+K** löscht eine Zeile, **Strg+#** kommentiert Zeilen aus,
-- **Format** (bzw. **Shift+Alt+F**) formatiert den Entwurf wie `dart format`
-  (Dart) bzw. `black` (Python),
+- **Format** (bzw. **Shift+Alt+F**) formatiert den Entwurf (Dart: wie
+  `dart format`, Python: `black`, JavaScript: `js-beautify`, Java:
+  `google-java-format`),
 - **Revert** verwirft ungespeicherte Änderungen.
 
 Nach dem Speichern prüft und übersetzt die App deinen Code automatisch. Ein
@@ -255,7 +311,7 @@ git status
 ```
 
 Füge nur deine eigene Datei hinzu. Ersetze wieder `DEIN_NAME` (und bei
-Python die Endung `.dart` durch `.py`):
+anderen Sprachen die Endung `.dart` durch `.py`, `.js` oder `.java`):
 
 ```bash
 git add DEIN_NAME/bubble_sort.dart
@@ -292,11 +348,12 @@ Bevor du deinen eigenen Algorithmus bearbeitest, solltest du im Verzeichnis
   `id_ed25519.pub` bei GitLab hinterlegt hast. Teste danach erneut mit
   `ssh -T git@git.nhcham.org`.
 - Dein Algorithmus erscheint nicht: Die Datei muss in einem eigenen Ordner
-  liegen (`algorithms/DEIN_NAME/datei.dart` bzw. `datei.py`) und der
-  Dateiname darf nur Buchstaben, Ziffern und `_` enthalten.
-- Bei Python-Dateien steht „Python 3.10 or newer is needed“: Installiere
-  Python 3 und starte `./run` neu. Ist Python unter einem anderen Namen
-  installiert, starte mit `SANDBOX_PYTHON=/pfad/zu/python3 ./run`.
+  liegen (`algorithms/DEIN_NAME/datei.dart`, `.py`, `.js` oder `.java`) und
+  der Dateiname darf nur Buchstaben, Ziffern und `_` enthalten.
+- Bei einer Datei steht „… or newer is needed“: Installiere Python 3,
+  Node.js bzw. ein JDK und starte `./run` neu. Liegt das Programm woanders,
+  starte mit `SANDBOX_PYTHON=/pfad/zu/python3 ./run`,
+  `SANDBOX_NODE=/pfad/zu/node ./run` bzw. `SANDBOX_JAVA_HOME=/pfad/zum/jdk ./run`.
 - Oben rechts steht **files with errors**: Ein Klick zeigt alle Dateien der
   Klasse, die gerade nicht übersetzt werden können. Fremde Dateien mit
   Fehlern stören deinen eigenen Algorithmus nicht.

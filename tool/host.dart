@@ -389,12 +389,15 @@ class Client {
         throw const FormatException('Invalid format request.');
       }
       final String formatted;
-      if (algorithm.language == Language.python) {
+      final language = algorithm.language;
+      if (language != Language.dart) {
+        // Formatted by the language's daemon (black, js-beautify,
+        // google-java-format), all vendored.
         checkDraftSize(content);
-        final reply = await builder.python.format(algorithm.path, content);
+        final reply = await builder.daemonFor(language).format(algorithm.path, content);
         if (reply['ok'] != true || reply['content'] is! String) {
-          throw FormatException(
-              reply['error']?.toString() ?? 'Python could not format this draft.');
+          throw FormatException(reply['error']?.toString() ??
+              '${language.label} could not format this draft.');
         }
         formatted = reply['content'] as String;
       } else {
