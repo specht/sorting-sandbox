@@ -2,16 +2,28 @@
 set -euo pipefail
 cd "$(dirname "$(realpath "$0")")"
 
+# Languages a student may choose (also works with the bash 3 of macOS).
+languages=(dart python)
+extension_of() { case "$1" in dart) echo dart ;; python) echo py ;; esac; }
+label_of() { case "$1" in dart) echo Dart ;; python) echo Python ;; esac; }
+
 usage() {
   cat <<'EOF'
 Create a new sorting algorithm in the separate class repository.
 
-  ./new-algorithm STUDENT              copy the Bubble Sort example
-  ./new-algorithm STUDENT FILE_NAME    start an empty algorithm
+  ./new-algorithm STUDENT                     copy the Bubble Sort example
+  ./new-algorithm STUDENT FILE_NAME           start an empty algorithm
+  ./new-algorithm ... --lang dart|python      choose the language
 
 Examples:
-  ./new-algorithm alice                creates algorithms/alice/bubble_sort.dart
-  ./new-algorithm alice quick_sort     creates algorithms/alice/quick_sort.dart
+  ./new-algorithm alice                       algorithms/alice/bubble_sort.dart
+  ./new-algorithm alice quick_sort            algorithms/alice/quick_sort.dart
+  ./new-algorithm alice quick_sort.py         algorithms/alice/quick_sort.py
+  ./new-algorithm alice --lang python         algorithms/alice/bubble_sort.py
+
+Without --lang (or a file extension) the language is, in this order: the
+language you last chose here, the language of your newest file, the language
+most of your class uses, or Dart. Your choice is remembered in .settings.yaml.
 
 FILE_NAME uses lowercase letters, digits and underscores. An existing file is
 never overwritten. The algorithms/ directory is its own Git repository: commit
@@ -19,10 +31,106 @@ and push your file there.
 EOF
 }
 
-if [[ $# -eq 0 || "$1" == "-h" || "$1" == "--help" ]]; then usage; exit 0; fi
-if (( $# > 2 )); then usage >&2; exit 64; fi
+known_language() {
+  local candidate="$1" language
+  for language in "${languages[@]}"; do
+    [[ "$language" == "$candidate" ]] && return 0
+  done
+  return 1
+}
 
-student="$1"
+language_of_extension() {
+  local file="$1" language
+  for language in "${languages[@]}"; do
+    if [[ "$file" == *".$(extension_of "$language")" ]]; then
+      echo "$language"
+      return 0
+    fi
+  done
+  return 1
+}
+
+settings=".settings.yaml"
+
+remembered_language() {
+  [[ -f "$settings" ]] || return 1
+  local value
+  value="$(sed -n -E 's/^[[:space:]]*language[[:space:]]*:[[:space:]]*["'\'']?([a-z]+)["'\'']?[[:space:]]*(#.*)?$/\1/p' "$settings" | tail -n 1)"
+  [[ -n "$value" ]] && known_language "$value" && echo "$value"
+}
+
+remember_language() {
+  local language="$1"
+  if [[ ! -f "$settings" ]]; then
+    printf '# Local settings of this sandbox. Not part of Git.\n' > "$settings"
+  fi
+  if grep -q -E '^[[:space:]]*language[[:space:]]*:' "$settings"; then
+    local temporary
+    temporary="$(mktemp)"
+    sed -E "s/^[[:space:]]*language[[:space:]]*:.*$/language: $language/" "$settings" > "$temporary"
+    cat "$temporary" > "$settings"
+    rm -f "$temporary"
+  else
+    printf 'language: %s\n' "$language" >> "$settings"
+  fi
+}
+
+# Algorithm files below a directory. Hidden folders and Python caches are
+# not algorithms.
+algorithm_files() {
+  local root="$1" depth="$2" pattern=() language
+  for language in "${languages[@]}"; do
+    (( ${#pattern[@]} )) && pattern+=(-o)
+    pattern+=(-name "*.$(extension_of "$language")")
+  done
+  [[ -d "$root" ]] || return 0
+  find "$root" -mindepth "$depth" -type f \( "${pattern[@]}" \) \
+    -not -path '*/.*' -not -path '*/__pycache__/*' 2>/dev/null || true
+}
+
+newest_own_language() {
+  local newest file
+  newest=""
+  while IFS= read -r file; do
+    if [[ -z "$newest" || "$file" -nt "$newest" ]]; then newest="$file"; fi
+  done < <(algorithm_files "algorithms/$1" 1)
+  [[ -n "$newest" ]] && language_of_extension "$newest"
+}
+
+class_language() {
+  local all language best="" best_count=0 count
+  all="$(algorithm_files algorithms 2)"
+  [[ -n "$all" ]] || return 1
+  # Ties go to the earlier language in the list (Dart first).
+  for language in "${languages[@]}"; do
+    count="$(grep -c -E "\.$(extension_of "$language")\$" <<< "$all" || true)"
+    if (( count > best_count )); then
+      best="$language"
+      best_count=$count
+    fi
+  done
+  [[ -n "$best" ]] && echo "$best"
+}
+
+positional=()
+chosen=""
+while (( $# )); do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --lang|--language)
+      if (( $# < 2 )); then usage >&2; exit 64; fi
+      chosen="$2"
+      shift 2
+      ;;
+    --lang=*|--language=*) chosen="${1#*=}"; shift ;;
+    -*) usage >&2; exit 64 ;;
+    *) positional+=("$1"); shift ;;
+  esac
+done
+if (( ${#positional[@]} == 0 )); then usage; exit 0; fi
+if (( ${#positional[@]} > 2 )); then usage >&2; exit 64; fi
+
+student="${positional[0]}"
 if [[ ! "$student" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]]; then
   echo 'Invalid student folder name (letters, digits, ., _ and -).' >&2
   exit 64
@@ -33,26 +141,57 @@ if [[ ! -d algorithms ]]; then
   exit 66
 fi
 
-if (( $# == 1 )); then
-  filename="bubble_sort"
-  source="templates/bubble_sort.dart"
+filename=""
+if (( ${#positional[@]} == 2 )); then
+  filename="${positional[1]}"
+  if from_extension="$(language_of_extension "$filename")"; then
+    if [[ -n "$chosen" && "$chosen" != "$from_extension" ]]; then
+      echo "The file name says $(label_of "$from_extension"), but --lang says $chosen." >&2
+      exit 64
+    fi
+    chosen="$from_extension"
+    filename="${filename%.*}"
+  fi
+fi
+
+if [[ -n "$chosen" ]]; then
+  if ! known_language "$chosen"; then
+    echo "Unknown language: $chosen (choose one of: ${languages[*]})." >&2
+    exit 64
+  fi
+  language="$chosen"
+  reason="your choice"
+elif language="$(remembered_language)"; then
+  reason="your last choice; use --lang to change it"
+elif language="$(newest_own_language "$student")"; then
+  reason="the language of your newest file; use --lang to change it"
+elif language="$(class_language)"; then
+  reason="the language most of your class uses; use --lang to change it"
 else
-  filename="${2%.dart}"
-  source="templates/empty.dart.tmpl"
+  language="dart"
+  reason="the default; use --lang to change it"
+fi
+ext="$(extension_of "$language")"
+
+if [[ -z "$filename" ]]; then
+  filename="bubble_sort"
+  source="templates/bubble_sort.$ext"
+else
+  source="templates/empty.$ext.tmpl"
 fi
 if [[ ! "$filename" =~ ^[a-z][a-z0-9_]{0,63}$ ]]; then
   echo 'Invalid file name: use lowercase letters, digits and underscores, e.g. quick_sort.' >&2
   exit 64
 fi
 
-target="algorithms/$student/$filename.dart"
+target="algorithms/$student/$filename.$ext"
 if [[ -e "$target" ]]; then
   echo "File exists; not overwriting: $target" >&2
   exit 73
 fi
 
 mkdir -p "algorithms/$student"
-if [[ "$source" == "templates/empty.dart.tmpl" ]]; then
+if [[ "$source" == templates/empty.* ]]; then
   # quick_sort -> class QuickSort, name 'Quick Sort'
   class_name="$(echo "$filename" | awk -F_ '{for (i = 1; i <= NF; i++) printf "%s", toupper(substr($i,1,1)) substr($i,2)}')"
   display_name="$(echo "$filename" | awk -F_ '{for (i = 1; i <= NF; i++) printf "%s%s", (i > 1 ? " " : ""), toupper(substr($i,1,1)) substr($i,2)}')"
@@ -61,5 +200,7 @@ if [[ "$source" == "templates/empty.dart.tmpl" ]]; then
 else
   cp "$source" "$target"
 fi
-echo "Created $target"
+# Only an explicit choice that actually created a file is remembered.
+[[ "$reason" == "your choice" ]] && remember_language "$language"
+echo "Created $target ($(label_of "$language"): $reason)"
 echo "Select it in the browser (Explore → Algorithm) to edit and run it."

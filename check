@@ -41,6 +41,9 @@ else
   echo "(no Python 3.10+ found: skipping the Python worker tests)"
 fi
 
+echo "==> new-algorithm (language choice)"
+bash test/new_algorithm.test.sh
+
 if command -v node >/dev/null 2>&1; then
   echo "==> Browser helper tests"
   for t in test/*.test.mjs; do node "$t"; done

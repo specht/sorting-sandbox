@@ -1,7 +1,9 @@
 # Sorting Sandbox
 
-Mit der Sorting Sandbox könnt ihr Sortieralgorithmen in Dart schreiben,
-beobachten, vergleichen und untersuchen.
+Mit der Sorting Sandbox könnt ihr Sortieralgorithmen in Dart oder Python
+schreiben, beobachten, vergleichen und untersuchen. Jede und jeder wählt die
+Sprache selbst; Algorithmen in verschiedenen Sprachen treten in derselben App
+gegeneinander an.
 
 ## Was liegt wo?
 
@@ -91,8 +93,9 @@ git pull
 
 ## 5. Die App starten
 
-Für die App wird nur das Dart SDK benötigt (kein Flutter). Starte sie in
-einem Terminal:
+Für die App wird nur das Dart SDK benötigt (kein Flutter). Wer in Python
+schreibt, braucht zusätzlich Python 3.10 oder neuer (`python3 --version`);
+alles Weitere bringt die App mit. Starte sie in einem Terminal:
 
 ```bash
 cd ~/sorting-sandbox
@@ -124,9 +127,9 @@ cd ~/sorting-sandbox
 ./new-algorithm DEIN_NAME
 ```
 
-Der Befehl legt `algorithms/DEIN_NAME/bubble_sort.dart` mit einem Bubble Sort
-als Ausgangspunkt an. Für einen weiteren, leeren Algorithmus gibst du einen
-Dateinamen an, zum Beispiel:
+Der Befehl legt `algorithms/DEIN_NAME/bubble_sort.dart` (oder
+`bubble_sort.py`, siehe unten) mit einem Bubble Sort als Ausgangspunkt an. Für
+einen weiteren, leeren Algorithmus gibst du einen Dateinamen an, zum Beispiel:
 
 ```bash
 ./new-algorithm DEIN_NAME quick_sort
@@ -138,9 +141,24 @@ weitere Dateien in deinem Ordner (etwa `merge_sort.dart` und
 `merge_sort_recursive.dart`). Tragen zwei davon denselben Namen, zeigt die App
 den Dateinamen dahinter an.
 
+### Dart oder Python?
+
+Die Sprache wählst du mit `--lang` oder einfach über die Dateiendung:
+
+```bash
+./new-algorithm DEIN_NAME --lang python        # bubble_sort.py
+./new-algorithm DEIN_NAME quick_sort.py        # leerer Algorithmus in Python
+./new-algorithm DEIN_NAME quick_sort --lang dart
+```
+
+Deine Wahl wird gemerkt. Gibst du keine Sprache an, nimmt der Befehl die
+Sprache, die du zuletzt gewählt hast, sonst die deiner neuesten Datei, sonst
+die Sprache, in der die meisten deiner Klasse schreiben, und erst dann Dart.
+Die Ausgabe sagt dir jeweils, warum.
+
 Die Datei erscheint nach wenigen Sekunden von selbst in der App. Wähle sie im
 Reiter **Explore** oben in der Algorithmen-Auswahl aus. Links siehst du den
-Quelltext und kannst ihn **direkt im Browser bearbeiten**:
+Quelltext und kannst ihn **direkt im Browser bearbeiten**. In Dart:
 
 ```dart
 import 'package:sorting_sandbox_api/sorting_sandbox_api.dart';
@@ -160,6 +178,30 @@ class BubbleSort extends SortingAlgorithm {
 }
 ```
 
+Und derselbe Algorithmus in Python:
+
+```python
+from sorting_sandbox import Colors, Elements, SortingAlgorithm
+
+
+class BubbleSort(SortingAlgorithm):
+    name = "Bubble Sort"
+    color = Colors.GREEN
+
+    def sort(self, elements: Elements, scratch: Elements) -> None:
+        length = len(elements)
+        for i in range(length):
+            for j in range(length - 1):
+                if elements[j] > elements[j + 1]:
+                    elements.swap(j, j + 1)
+```
+
+In beiden Sprachen zählen Lesen (`elements[i]`), Schreiben
+(`elements[i] = x`) und Vergleichen (`<`, `<=`, `>`, `>=`, `==`) genau gleich;
+`swap` sind zwei Lese- und zwei Schreibzugriffe. In Python sind negative
+Indizes wie `elements[-1]` ein Fehler (wie in Dart) und keine Abkürzung für
+das letzte Element.
+
 Du kannst `name`, `color` und natürlich den Sortieralgorithmus ändern. Der
 Autor ist automatisch dein Ordnername. Der Bubble Sort ist absichtlich noch
 nicht optimiert: Untersuche zum Beispiel, ob beide Schleifen wirklich immer so
@@ -169,7 +211,8 @@ Im Editor gelten diese Tastenkürzel:
 
 - **Strg+S** speichert die Datei (oder der Knopf **Save**),
 - **Strg+Shift+K** löscht eine Zeile, **Strg+#** kommentiert Zeilen aus,
-- **Format** (bzw. **Shift+Alt+F**) formatiert den Entwurf wie `dart format`,
+- **Format** (bzw. **Shift+Alt+F**) formatiert den Entwurf wie `dart format`
+  (Dart) bzw. `black` (Python),
 - **Revert** verwirft ungespeicherte Änderungen.
 
 Nach dem Speichern prüft und übersetzt die App deinen Code automatisch. Ein
@@ -211,7 +254,8 @@ cd ~/sorting-sandbox/algorithms
 git status
 ```
 
-Füge nur deine eigene Datei hinzu. Ersetze wieder `DEIN_NAME`:
+Füge nur deine eigene Datei hinzu. Ersetze wieder `DEIN_NAME` (und bei
+Python die Endung `.dart` durch `.py`):
 
 ```bash
 git add DEIN_NAME/bubble_sort.dart
@@ -248,8 +292,11 @@ Bevor du deinen eigenen Algorithmus bearbeitest, solltest du im Verzeichnis
   `id_ed25519.pub` bei GitLab hinterlegt hast. Teste danach erneut mit
   `ssh -T git@git.nhcham.org`.
 - Dein Algorithmus erscheint nicht: Die Datei muss in einem eigenen Ordner
-  liegen (`algorithms/DEIN_NAME/datei.dart`) und der Dateiname darf nur
-  Buchstaben, Ziffern und `_` enthalten.
+  liegen (`algorithms/DEIN_NAME/datei.dart` bzw. `datei.py`) und der
+  Dateiname darf nur Buchstaben, Ziffern und `_` enthalten.
+- Bei Python-Dateien steht „Python 3.10 or newer is needed“: Installiere
+  Python 3 und starte `./run` neu. Ist Python unter einem anderen Namen
+  installiert, starte mit `SANDBOX_PYTHON=/pfad/zu/python3 ./run`.
 - Oben rechts steht **files with errors**: Ein Klick zeigt alle Dateien der
   Klasse, die gerade nicht übersetzt werden können. Fremde Dateien mit
   Fehlern stören deinen eigenen Algorithmus nicht.
