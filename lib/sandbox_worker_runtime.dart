@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:sorting_sandbox_api/sorting_sandbox_api.dart';
 
+import 'judge.dart' show isSortedKeys, isStableKeys;
+
 CheckpointSession? _activeCheckpointSession;
 
 /// The visual session that generated code is currently reporting to, if any.
@@ -263,62 +265,9 @@ RunResult runSyncAlgorithm(dynamic algorithm, List<int> values) {
   final origins = probe.origins('list');
   return RunResult(
     sorted: isSortedKeys(keys),
-    stable: _isStable(keys, origins),
+    stable: isStableKeys(keys, origins),
     keys: keys,
     origins: origins,
     metrics: probe.metrics,
   );
-}
-
-bool isSortedKeys(List<int> values) {
-  for (var i = 1; i < values.length; i++) {
-    if (values[i - 1] > values[i]) return false;
-  }
-  return true;
-}
-
-bool _isStable(List<int> keys, List<int> origins) {
-  if (!isSortedKeys(keys)) return false;
-  for (var i = 1; i < keys.length; i++) {
-    if (keys[i - 1] == keys[i] && origins[i - 1] > origins[i]) return false;
-  }
-  return true;
-}
-
-List<List<int>> stabilityCases() {
-  final seeds = <List<int>>[
-    [2, 2, 1],
-    [2, 1, 2, 1],
-    [0, 0, 1, 1, 2],
-    [3, 1, 3, 2, 3, 1],
-  ];
-  final result = <List<int>>[];
-  for (final seed in seeds) {
-    result.addAll(_uniquePermutations(seed));
-  }
-  return result;
-}
-
-List<List<int>> _uniquePermutations(List<int> values) {
-  final sorted = List<int>.from(values)..sort();
-  final out = <List<int>>[];
-
-  void walk(List<int> prefix, List<int> rest) {
-    if (rest.isEmpty) {
-      out.add(List<int>.from(prefix));
-      return;
-    }
-    int? last;
-    for (var i = 0; i < rest.length; i++) {
-      if (last == rest[i]) continue;
-      last = rest[i];
-      final nextRest = List<int>.from(rest)..removeAt(i);
-      prefix.add(rest[i]);
-      walk(prefix, nextRest);
-      prefix.removeLast();
-    }
-  }
-
-  walk([], sorted);
-  return out;
 }

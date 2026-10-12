@@ -6,6 +6,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:sorting_sandbox/judge.dart';
+
 import 'build.dart';
 import 'catalog.dart';
 import 'instrument_client.dart';
@@ -154,31 +156,77 @@ class WorkerProcess {
   }
 }
 
-/// Starts a worker, sends one request and waits for [reply] (or an error).
-Future<Map<String, dynamic>> requestOnce(
+/// The worker reported a protocol error instead of a result.
+class WorkerReportedError implements Exception {
+  WorkerReportedError(this.message, this.error);
+  final String message;
+  final Object? error;
+  @override
+  String toString() => message;
+}
+
+/// One worker kept for a check or an analysis. It sorts one input per `run`
+/// request; lib/judge.dart decides what the results mean.
+class CaseSession {
+  CaseSession._(this.worker) {
+    worker.onMessage = (message) {
+      final type = message['type'];
+      if (type != 'runResult' && type != 'error') return; // e.g. console
+      final waiting = _waiting;
+      _waiting = null;
+      if (waiting != null && !waiting.isCompleted) waiting.complete(message);
+    };
+    worker.onExit = (reason) {
+      _exited = reason;
+      final waiting = _waiting;
+      _waiting = null;
+      if (waiting != null && !waiting.isCompleted) {
+        waiting.completeError(WorkerExited(reason));
+      }
+    };
+  }
+
+  final WorkerProcess worker;
+  Completer<Map<String, dynamic>>? _waiting;
+  String? _exited;
+  int _next = 0;
+
+  static Future<CaseSession> start(BuiltAlgorithm built) async =>
+      CaseSession._(await WorkerProcess.start(built.kernelPath));
+
+  Future<CaseResult> run(List<int> values) async {
+    final exited = _exited;
+    if (exited != null) throw WorkerExited(exited);
+    final waiting = Completer<Map<String, dynamic>>();
+    _waiting = waiting;
+    worker.send({'type': 'run', 'requestId': 'case${_next++}', 'values': values});
+    final reply = await waiting.future;
+    if (reply['type'] == 'error') {
+      throw WorkerReportedError(
+        reply['message']?.toString() ?? 'The worker reported an error.',
+        reply['error'],
+      );
+    }
+    return CaseResult.fromJson(reply);
+  }
+
+  void kill() => worker.kill();
+}
+
+/// Starts a worker for [built] and lets [judge] run its cases there.
+/// Throws [TimeoutException], [WorkerExited] or [WorkerReportedError].
+Future<Map<String, Object?>> judgeInWorker(
   BuiltAlgorithm built,
-  Map<String, Object?> request, {
-  required String reply,
+  Future<Map<String, Object?>> Function(CaseRunner run) judge, {
   required Duration timeout,
   void Function(WorkerProcess worker)? register,
 }) async {
-  final worker = await WorkerProcess.start(built.kernelPath);
-  register?.call(worker);
-  final result = Completer<Map<String, dynamic>>();
-  worker.onMessage = (message) {
-    final type = message['type'];
-    if ((type == reply || type == 'error') && !result.isCompleted) {
-      result.complete(message);
-    }
-  };
-  worker.onExit = (reason) {
-    if (!result.isCompleted) result.completeError(WorkerExited(reason));
-  };
-  worker.send(request);
+  final session = await CaseSession.start(built);
+  register?.call(session.worker);
   try {
-    return await result.future.timeout(timeout);
+    return await judge(session.run).timeout(timeout);
   } finally {
-    worker.kill();
+    session.kill();
   }
 }
 
@@ -534,11 +582,10 @@ class Client {
     Future<void> lane() async {
       while (queue.isNotEmpty && !job.cancelled && !closed) {
         final id = queue.removeAt(0);
-        final outcome = await _runJobRequest(
+        final outcome = await _runJob(
           job,
           id,
-          {'type': 'analyze', 'requestId': jobId, 'cases': cases},
-          reply: 'analysisResult',
+          (run) => analyzeCases(run, cases),
           timeout: analysisTimeout,
         );
         if (job.cancelled || closed) return;
@@ -560,26 +607,19 @@ class Client {
       return;
     }
     final job = _newJob(jobId);
-    final outcome = await _runJobRequest(
-      job,
-      id,
-      {'type': 'check', 'requestId': jobId},
-      reply: 'checkResult',
-      timeout: checkTimeout,
-    );
+    final outcome = await _runJob(job, id, checkCases, timeout: checkTimeout);
     if (!job.cancelled && !closed) {
       send({'type': 'checkResult', 'jobId': jobId, 'id': id, ...outcome});
     }
     _endJob(job);
   }
 
-  /// Builds (if needed) and runs one disposable request. Never throws: the
-  /// outcome is `{revision, result: {status, ...}}`.
-  Future<Map<String, Object?>> _runJobRequest(
+  /// Builds (if needed) and judges [id] in one disposable worker. Never
+  /// throws: the outcome is `{revision, result: {status, ...}}`.
+  Future<Map<String, Object?>> _runJob(
     Job job,
     String id,
-    Map<String, Object?> request, {
-    required String reply,
+    Future<Map<String, Object?>> Function(CaseRunner run) judge, {
     required Duration timeout,
   }) async {
     final algorithm = catalog[id];
@@ -590,27 +630,18 @@ class Client {
     try {
       final built = await catalog.ensureBuilt(id);
       if (job.cancelled) return {'revision': revision, 'result': {'status': 'cancelled'}};
-      final response = await requestOnce(
+      final result = await judgeInWorker(
         built,
-        request,
-        reply: reply,
+        judge,
         timeout: timeout,
         register: job.track,
       );
-      if (response['type'] == 'error') {
-        return {
-          'revision': revision,
-          'result': {
-            'status': 'crash',
-            'message': response['message']?.toString() ?? 'The worker reported an error.',
-            'error': response['error'],
-          },
-        };
-      }
-      final result = Map<String, Object?>.from(response)
-        ..remove('type')
-        ..remove('requestId');
       return {'revision': revision, 'result': {'status': 'done', ...result}};
+    } on WorkerReportedError catch (failure) {
+      return {
+        'revision': revision,
+        'result': {'status': 'crash', 'message': failure.message, 'error': failure.error},
+      };
     } on BuildFailure catch (failure) {
       return {
         'revision': revision,

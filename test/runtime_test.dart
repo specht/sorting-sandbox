@@ -1,3 +1,4 @@
+import 'package:sorting_sandbox/judge.dart';
 import 'package:sorting_sandbox/sandbox_worker_runtime.dart';
 import 'package:sorting_sandbox/worker_core.dart';
 import 'package:sorting_sandbox_api/sorting_sandbox_api.dart';
@@ -75,6 +76,10 @@ class Overwriting extends SortingAlgorithm {
     list[0] = list[1];
   }
 }
+
+/// What the host does with a real worker: one `run` request per input.
+CaseRunner runnerFor(AlgorithmFactory create) =>
+    (values) async => CaseResult.fromJson(runCase(create, values));
 
 void main() {
   test('hidden origins detect stability without student annotations', () {
@@ -203,8 +208,8 @@ void main() {
     expect(frames.last['done'], isTrue);
   });
 
-  test('analysis reports correctness, stability and identical inputs', () {
-    final stable = analyzeAlgorithm(StableInsertion.new, [
+  test('analysis reports correctness, stability and identical inputs', () async {
+    final stable = await analyzeCases(runnerFor(StableInsertion.new), [
       [3, 1, 2],
       [5, 4, 3, 2, 1],
     ]);
@@ -212,17 +217,17 @@ void main() {
     expect(stable['stable'], isTrue);
     expect((stable['benchmarks'] as List).length, 2);
 
-    final unstable = analyzeAlgorithm(UnstableSelection.new, const []);
+    final unstable = await analyzeCases(runnerFor(UnstableSelection.new), const []);
     expect(unstable['correct'], isTrue);
     expect(unstable['stable'], isFalse);
 
-    final broken = analyzeAlgorithm(Broken.new, const []);
+    final broken = await analyzeCases(runnerFor(Broken.new), const []);
     expect(broken['correct'], isFalse);
     expect(broken['stable'], null);
   });
 
-  test('the check report names the failing group and input', () {
-    final report = checkAlgorithm(Broken.new);
+  test('the check report names the failing group and input', () async {
+    final report = await checkCases(runnerFor(Broken.new));
     expect(report['correct'], isFalse);
     final groups = (report['groups'] as List).cast<Map<String, Object?>>();
     expect(groups.first['ok'], isTrue, reason: 'empty and one-element lists');
@@ -230,20 +235,28 @@ void main() {
     final failure = failing['failure'] as Map<String, Object?>;
     expectContains(failure['message'].toString(), 'not sorted');
 
-    final good = checkAlgorithm(StableInsertion.new);
+    final good = await checkCases(runnerFor(StableInsertion.new));
     expect(good['correct'], isTrue);
     expect((good['stability'] as Map)['stable'], isTrue);
   });
 
-  test('an exception becomes a report with the student line', () {
-    final report = analyzeAlgorithm(Throwing.new, const []);
+  test('an exception becomes a report with the student line', () async {
+    final report = await analyzeCases(runnerFor(Throwing.new), const []);
     expect(report['correct'], isFalse);
     final error = report['error'] as Map<String, Object?>;
     expectContains(error['message'].toString(), 'RangeError');
   });
 
   test('overwritten elements are detected through hidden origins', () {
-    final result = runSyncAlgorithm(Overwriting(), [2, 1]);
+    final result = CaseResult.fromJson(runCase(Overwriting.new, [2, 1]));
     expectContains(judgeResult([2, 1], result) ?? '', 'overwritten');
+  });
+
+  test('a run reports keys, hidden origins and counts as plain JSON', () {
+    final result = runCase(StableInsertion.new, [2, 2, 1]);
+    expect(result['keys'], [1, 2, 2]);
+    expect(result['origins'], [2, 0, 1]);
+    final metrics = result['metrics'] as Map<String, int>;
+    expect(metrics['score'], metrics['reads']! + metrics['writes']! + metrics['comparisons']!);
   });
 }

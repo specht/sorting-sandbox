@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math';
 
 import 'package:sorting_sandbox_api/sorting_sandbox_api.dart';
 
@@ -13,10 +12,11 @@ typedef AlgorithmFactory = SortingAlgorithm Function();
 ///   visualStart {requestId, values}   run the generated async copy; frames
 ///                                     are emitted whenever the budget is used up
 ///   advance     {requestId, budget}   grant more checkpoints to the visual run
-///   analyze     {requestId, cases}    correctness, stability and benchmarks
-///   check       {requestId}           detailed correctness report
-/// Replies: frame, complete, runError, console, analysisResult, checkResult,
-/// error.
+///   run         {requestId, values}   sort once without visualization overhead;
+///                                     the host judges the result (lib/judge.dart)
+/// Replies: frame, complete, runError, console, runResult, error.
+///
+/// Workers of the other languages (languages/*/) speak the same protocol.
 class WorkerCore {
   WorkerCore({
     required this.post,
@@ -40,22 +40,12 @@ class WorkerCore {
           await _visualStart(requestId, message);
         case 'advance':
           _visual?.addBudget(_toInt(message['budget'], 1));
-        case 'analyze':
-          {
-            final raw = message['cases'];
-            final cases = <List<int>>[
-              if (raw is List)
-                for (final entry in raw) _intList(entry),
-            ];
-            final analysis =
-                silently(() => analyzeAlgorithm(createBenchmark, cases));
-            post({'type': 'analysisResult', 'requestId': requestId, ...analysis});
-          }
-        case 'check':
-          {
-            final report = silently(() => checkAlgorithm(createBenchmark));
-            post({'type': 'checkResult', 'requestId': requestId, ...report});
-          }
+        case 'run':
+          post({
+            'type': 'runResult',
+            'requestId': requestId,
+            ...runCase(createBenchmark, _intList(message['values'])),
+          });
         default:
           post({
             'type': 'error',
@@ -163,221 +153,22 @@ T silently<T>(T Function() body) => runZoned(
       ),
     );
 
-const _correctnessCases = <List<int>>[
-  [],
-  [1],
-  [2, 1],
-  [1, 2],
-  [3, 1, 2],
-  [4, 3, 2, 1],
-  [1, 1, 1, 1],
-  [3, 1, 3, 2, 1, 2],
-];
-
-/// Class-wide analysis: correctness, empirical stability and the operation
-/// counts for every benchmark input. All algorithms receive the SAME inputs.
-Map<String, Object?> analyzeAlgorithm(
-  AlgorithmFactory create,
-  List<List<int>> benchmarkCases,
-) {
-  List<int>? current;
-  Map<String, Object?> incorrect(List<int> values, String reason) => {
-        'correct': false,
-        'stable': null,
-        'failingCase': _show(values),
-        'reason': reason,
-        'benchmarks': const <Object?>[],
-      };
+/// Sorts [values] once with the benchmark copy, with `print` discarded.
+///
+/// The result is what every language's worker reports for `run`:
+/// `{keys, origins, metrics}` or `{error}` with the student's line.
+Map<String, Object?> runCase(AlgorithmFactory create, List<int> values) {
   try {
-    for (final values in _correctnessCases) {
-      current = values;
-      final reason = judgeResult(values, runSyncAlgorithm(create(), values));
-      if (reason != null) return incorrect(values, reason);
-    }
-
-    var stable = true;
-    for (final values in stabilityCases()) {
-      current = values;
-      final result = runSyncAlgorithm(create(), values);
-      final reason = judgeResult(values, result);
-      if (reason != null) return incorrect(values, reason);
-      if (!result.stable) {
-        stable = false;
-        break;
-      }
-    }
-
-    final benchmarks = <Map<String, Object?>>[];
-    for (final values in benchmarkCases) {
-      current = values;
-      final result = runSyncAlgorithm(create(), values);
-      final reason = judgeResult(values, result);
-      if (reason != null) return incorrect(values, reason);
-      benchmarks.add({'n': values.length, ...result.metrics.toJson()});
-    }
+    final result = silently(() => runSyncAlgorithm(create(), values));
     return {
-      'correct': true,
-      'stable': stable,
-      'failingCase': null,
-      'benchmarks': benchmarks,
+      'keys': result.keys,
+      'origins': result.origins,
+      'metrics': result.metrics.toJson(),
     };
   } catch (error, stack) {
-    final failing = current;
-    return {
-      'correct': false,
-      'stable': null,
-      'failingCase': failing == null ? null : _show(failing),
-      'reason': 'The algorithm threw an exception.',
-      'error': describeFailure(error, stack),
-      'benchmarks': const <Object?>[],
-    };
+    return {'error': describeFailure(error, stack)};
   }
 }
-
-class _CheckGroup {
-  const _CheckGroup(this.name, this.cases);
-  final String name;
-  final List<List<int>> cases;
-}
-
-List<_CheckGroup> _checkGroups() {
-  final random = Random(20240611);
-  List<int> shuffled(int n) => List<int>.generate(n, (i) => i + 1)..shuffle(random);
-  List<int> withDuplicates(int n, int distinct) =>
-      List<int>.generate(n, (_) => random.nextInt(distinct));
-  return [
-    const _CheckGroup('Empty list and one element', [
-      [],
-      [7],
-    ]),
-    const _CheckGroup('Two and three elements', [
-      [1, 2],
-      [2, 1],
-      [1, 2, 3],
-      [1, 3, 2],
-      [2, 1, 3],
-      [2, 3, 1],
-      [3, 1, 2],
-      [3, 2, 1],
-    ]),
-    _CheckGroup('Already sorted and reversed', [
-      List<int>.generate(10, (i) => i + 1),
-      List<int>.generate(10, (i) => 10 - i),
-      List<int>.generate(9, (i) => 9 - i),
-    ]),
-    const _CheckGroup('Duplicates', [
-      [4, 4, 4, 4],
-      [2, 1, 2, 1, 2],
-      [3, 1, 3, 2, 1, 2],
-      [0, 0, 1, 1, 0, 0],
-    ]),
-    _CheckGroup('Random inputs up to 40 elements', [
-      for (var n = 4; n <= 40; n += 2)
-        n % 4 == 0 ? shuffled(n) : withDuplicates(n, n ~/ 2 + 1),
-    ]),
-    _CheckGroup('Larger inputs', [
-      shuffled(100),
-      shuffled(255),
-      withDuplicates(300, 20),
-      shuffled(512),
-    ]),
-  ];
-}
-
-/// Detailed report for one algorithm, shown in the Check dialog.
-Map<String, Object?> checkAlgorithm(AlgorithmFactory create) {
-  final groups = <Map<String, Object?>>[];
-  var allCorrect = true;
-  for (final group in _checkGroups()) {
-    var passed = 0;
-    Map<String, Object?>? failure;
-    for (final values in group.cases) {
-      try {
-        final result = runSyncAlgorithm(create(), values);
-        final reason = judgeResult(values, result);
-        if (reason == null) {
-          passed++;
-          continue;
-        }
-        failure = {
-          'input': _preview(values),
-          'output': _preview(result.keys),
-          'message': reason,
-        };
-      } catch (error, stack) {
-        failure = {
-          'input': _preview(values),
-          'message': 'The algorithm threw an exception.',
-          'error': describeFailure(error, stack),
-        };
-      }
-      break;
-    }
-    if (failure != null) allCorrect = false;
-    groups.add({
-      'name': group.name,
-      'total': group.cases.length,
-      'passed': passed,
-      'ok': failure == null,
-      'failure': failure,
-    });
-  }
-
-  Map<String, Object?> stability = {'tested': false};
-  if (allCorrect) {
-    stability = {'tested': true, 'stable': true};
-    final random = Random(7);
-    final cases = <List<int>>[
-      ...stabilityCases(),
-      for (var n = 6; n <= 30; n += 3)
-        List<int>.generate(n, (_) => random.nextInt(4)),
-    ];
-    try {
-      for (final values in cases) {
-        final result = runSyncAlgorithm(create(), values);
-        if (judgeResult(values, result) == null && !result.stable) {
-          stability = {
-            'tested': true,
-            'stable': false,
-            'input': values,
-            'output': result.keys,
-            'origins': result.origins,
-          };
-          break;
-        }
-      }
-    } catch (_) {
-      stability = {'tested': false};
-    }
-  }
-  return {'groups': groups, 'stability': stability, 'correct': allCorrect};
-}
-
-/// Null when [result] is a correct sort of [input]; otherwise the reason.
-String? judgeResult(List<int> input, RunResult result) {
-  if (result.keys.length != input.length) return 'The list changed its length.';
-  final origins = List<int>.from(result.origins)..sort();
-  for (var i = 0; i < origins.length; i++) {
-    if (origins[i] != i) {
-      return result.origins.any((origin) => origin < 0)
-          ? 'Elements of the temporary list ended up in the result: '
-              'some elements were overwritten.'
-          : 'Some elements were overwritten or duplicated: the result is '
-              'not a rearrangement of the input.';
-    }
-  }
-  if (!result.sorted) return 'The result is not sorted.';
-  return null;
-}
-
-Map<String, Object?> _preview(List<int> values) => {
-      'length': values.length,
-      'values': values.length <= 64 ? values : values.sublist(0, 64),
-    };
-
-String _show(List<int> values) => values.length <= 24
-    ? values.toString()
-    : '[${values.take(24).join(', ')}, …] (n = ${values.length})';
 
 /// Turns an exception from student code into a report with original line
 /// numbers. Benchmark copies are byte-identical to the student file; visual

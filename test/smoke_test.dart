@@ -8,7 +8,9 @@ import 'dart:io';
 
 import '../tool/build.dart';
 import '../tool/catalog.dart';
-import '../tool/host.dart' show WorkerProcess, requestOnce;
+import 'package:sorting_sandbox/judge.dart';
+
+import '../tool/host.dart' show WorkerProcess, judgeInWorker;
 import '../tool/instrument_client.dart';
 import 'harness.dart';
 
@@ -88,19 +90,18 @@ void main() {
     final built = await builder.build(
         source(File('templates/bubble_sort.dart').readAsStringSync()),
         subject: 'smoke/bubble-check');
-    final check = await requestOnce(built, {'type': 'check', 'requestId': 'c'},
-        reply: 'checkResult', timeout: const Duration(seconds: 30));
+    final check = await judgeInWorker(built, checkCases,
+        timeout: const Duration(seconds: 30));
     expect(check['correct'], isTrue);
     expect((check['stability'] as Map)['stable'], isTrue);
 
-    final analysis = await requestOnce(built, {
-      'type': 'analyze',
-      'requestId': 'a',
-      'cases': [
-        [4, 3, 2, 1],
-        [2, 1],
-      ],
-    }, reply: 'analysisResult', timeout: const Duration(seconds: 30));
+    final analysis = await judgeInWorker(
+        built,
+        (run) => analyzeCases(run, [
+              [4, 3, 2, 1],
+              [2, 1],
+            ]),
+        timeout: const Duration(seconds: 30));
     expect(analysis['correct'], isTrue);
     expect((analysis['benchmarks'] as List).length, 2);
   });
@@ -179,8 +180,8 @@ class Merge extends SortingAlgorithm {
     final run = await runVisual(built, [5, 2, 4, 1, 3]);
     expect(run.error, null);
     expect(run.frames.last['numbers'], [1, 2, 3, 4, 5]);
-    final check = await requestOnce(built, {'type': 'check', 'requestId': 'c'},
-        reply: 'checkResult', timeout: const Duration(seconds: 30));
+    final check = await judgeInWorker(built, checkCases,
+        timeout: const Duration(seconds: 30));
     expect(check['correct'], isTrue);
   });
 

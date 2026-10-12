@@ -18,8 +18,9 @@ update-algorithms       git pull in the nested class repository
 check                   analysis + all tests
 packages/sorting_sandbox_api/   the tiny student-facing API (Elements, Colors, …)
 lib/
+  judge.dart                    host-side Check/Analyze: correctness, stability, benchmarks
   sandbox_worker_runtime.dart   operation counting, checkpoints, stability
-  worker_core.dart              worker protocol: visual runs, check, analysis
+  worker_core.dart              worker protocol: visual runs and single sorts (`run`)
   worker_process.dart           stdin/stdout loop of a generated worker
 tool/
   host.dart               HTTP + WebSocket server, runs, checks, analysis jobs
@@ -94,6 +95,12 @@ Each browser run gets its **own disposable worker process**:
   input and the wrong result, or the exception with its line.
 - **Analyze**: correctness and stability cases, then the same benchmark inputs
   for every algorithm (two workers in parallel).
+
+Check and Analyze are judged by the **host** (`lib/judge.dart`). The worker
+only answers `run {values}` with the resulting keys, hidden origins and
+operation counts (or the student's exception); the host sends one input at a
+time and stops at the first failure. Workers of every language are therefore
+judged by the same code on the same inputs.
 
 Student `print` output is forwarded to the Console with its source line. An
 exception reports its message, line and the student frames of the stack. A
