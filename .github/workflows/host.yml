@@ -1,0 +1,67 @@
+# Builds the app (tool/host.dart) as a self-contained program for each
+# platform, so that ./run and run.cmd work on computers without a Dart SDK
+# (schools that teach Python, JavaScript or Java only).
+#
+# The release tag is derived from the Git objects the app is built from, the
+# same key ./run and run.cmd compute: host-<first 16 hex digits of
+#   git ls-tree HEAD tool lib pubspec.yaml pubspec.lock | git hash-object --stdin>
+# A version that was built before is not built again.
+name: Precompiled app
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.key.outputs.tag }}
+      build: ${{ steps.key.outputs.build }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: key
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          key="$(git ls-tree HEAD tool lib pubspec.yaml pubspec.lock | git hash-object --stdin)"
+          tag="host-${key:0:16}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if gh release view "$tag" --json assets --jq '.assets | length' 2>/dev/null | grep -qx 5; then
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --prerelease \
+              --target "$GITHUB_SHA" --title "App $tag" \
+              --notes "The precompiled app for computers without a Dart SDK. ./run and run.cmd download it automatically."
+          fi
+
+  build:
+    needs: release
+    if: needs.release.outputs.build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {runner: ubuntu-latest, name: sandbox-host-linux-x64}
+          - {runner: ubuntu-24.04-arm, name: sandbox-host-linux-arm64}
+          - {runner: macos-latest, name: sandbox-host-macos-arm64}
+          - {runner: macos-15-intel, name: sandbox-host-macos-x64}
+          - {runner: windows-latest, name: sandbox-host-windows-x64.exe}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - run: dart pub get
+      - run: dart compile exe tool/host.dart -o ${{ matrix.name }}
+      - name: Upload
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ needs.release.outputs.tag }}" "${{ matrix.name }}" --clobber

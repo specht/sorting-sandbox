@@ -51,7 +51,7 @@ class BuiltAlgorithm {
             'sandbox_worker.mjs', [Directory(kernelPath).absolute.path, meta.className]),
         Language.java =>
           await javaToolchain.worker(Directory(kernelPath).absolute.path, meta.className),
-        _ => [Platform.resolvedExecutable, kernelPath],
+        _ => [await dartToolchain.executable(), kernelPath],
       };
 }
 
@@ -248,7 +248,7 @@ class WorkerBuilder {
         .writeAsStringSync(workerSource(meta.className));
     final kernel = File('${directory.path}/worker.dill');
     final compileClock = Stopwatch()..start();
-    final compiled = await Process.run(Platform.resolvedExecutable, [
+    final compiled = await Process.run(await dartToolchain.executable(), [
       'compile',
       'kernel',
       '${directory.path}/worker.dart',
@@ -394,7 +394,7 @@ Future<void> main() => runWorkerProcess(
 Future<List<Map<String, Object?>>> analyzeFile(File file) async {
   try {
     final result = await Process.run(
-      Platform.resolvedExecutable,
+      await dartToolchain.executable(),
       ['analyze', '--format=machine', file.absolute.path],
     );
     final expected = file.absolute.path;

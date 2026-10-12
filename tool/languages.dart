@@ -95,6 +95,54 @@ class ToolchainMissing extends InstrumenterUnavailable {
   ToolchainMissing(super.message);
 }
 
+/// The Dart SDK, for .dart files: compiling workers, the analyzer daemon,
+/// `dart format`.
+///
+/// Under `dart run` (./run with a Dart SDK) this is the running `dart`, as it
+/// always was. The precompiled host (./run without a Dart SDK, for schools
+/// that only teach Python, JavaScript or Java) looks for $SANDBOX_DART or
+/// `dart` on the PATH; without one, only .dart files show an explanation.
+class DartToolchain {
+  /// True in a host compiled with `dart compile exe`.
+  static const precompiled = bool.fromEnvironment('dart.vm.product');
+
+  Future<String>? _executable;
+
+  /// Throws [ToolchainMissing].
+  Future<String> executable() => _executable ??= _find();
+
+  /// Whether .dart files can be built (never throws).
+  Future<bool> available() async {
+    try {
+      await executable();
+      return true;
+    } on ToolchainMissing {
+      return false;
+    }
+  }
+
+  Future<String> _find() async {
+    if (!precompiled) return Platform.resolvedExecutable;
+    final configured = Platform.environment['SANDBOX_DART'];
+    for (final candidate in [
+      if (configured != null && configured.trim().isNotEmpty) configured.trim(),
+      'dart',
+    ]) {
+      final output = await _probe([candidate], ['--version']);
+      if (output != null && output.contains('Dart SDK')) {
+        stdout.writeln('[dart] Using $candidate');
+        return candidate;
+      }
+    }
+    throw ToolchainMissing(
+      'The Dart SDK is needed for .dart files but was not found. Install Dart '
+      '(https://dart.dev/get-dart) and restart ./run, or set SANDBOX_DART.',
+    );
+  }
+}
+
+final dartToolchain = DartToolchain();
+
 /// Finds a Python 3.10+ interpreter once per host process.
 ///
 /// Order: $SANDBOX_PYTHON (a path or command), `python3`, `python`, and on

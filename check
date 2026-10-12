@@ -54,6 +54,9 @@ fi
 echo "==> new-algorithm (language choice)"
 bash test/new_algorithm.test.sh
 
+echo "==> ./run without a Dart SDK (precompiled app)"
+bash test/precompiled_run.test.sh
+
 if command -v node >/dev/null 2>&1; then
   echo "==> Browser helper and JavaScript worker tests"
   for t in test/*.test.mjs; do node "$t"; done

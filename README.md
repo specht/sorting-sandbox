@@ -93,11 +93,21 @@ git pull
 
 ## 5. Die App starten
 
-Für die App wird nur das Dart SDK benötigt (kein Flutter). Für die anderen
-Sprachen braucht dein Computer zusätzlich deren Interpreter bzw. Compiler:
-Python 3.10 oder neuer (`python3 --version`), Node.js 18 oder neuer
-(`node --version`) bzw. ein JDK 17 oder neuer (`javac -version`). Alles
-Weitere bringt die App mit. Starte sie in einem Terminal:
+Für Algorithmen in Dart braucht dein Computer das Dart SDK (kein Flutter),
+für die anderen Sprachen deren Interpreter bzw. Compiler: Python 3.10 oder
+neuer (`python3 --version`), Node.js 18 oder neuer (`node --version`) bzw. ein
+JDK 17 oder neuer (`javac -version`). Alles Weitere bringt die App mit.
+
+Ohne Dart SDK (etwa an Schulen, die nur Java unterrichten) lädt `./run` beim
+ersten Start die fertig übersetzte App für deinen Computer von GitHub herunter
+und startet sie; danach geht das auch offline. Dart-Algorithmen zeigen dann
+nur den Hinweis, dass Dart fehlt.
+
+**Windows:** Starte die App mit `run.cmd` statt `./run` und lege Algorithmen
+mit `new-algorithm.cmd` statt `./new-algorithm` an (das braucht Git für
+Windows).
+
+Starte die App in einem Terminal:
 
 ```bash
 cd ~/sorting-sandbox

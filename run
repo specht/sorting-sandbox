@@ -20,9 +20,64 @@ for arg in "$@"; do
   if [[ "$arg" == "-h" || "$arg" == "--help" ]]; then usage; exit 0; fi
 done
 
-if ! command -v dart >/dev/null 2>&1; then
-  echo 'The Dart SDK is required in PATH (https://dart.dev/get-dart).' >&2
-  exit 127
+# With a Dart SDK, the app runs from source (as always). Without one, for
+# schools that teach Python, JavaScript or Java only, ./run starts the
+# precompiled app for this computer, built by GitHub Actions for exactly this
+# version of the app (.github/workflows/host.yml), and downloads it once.
+# SANDBOX_PRECOMPILED=1 ./run tries that even where Dart is installed.
+if [[ "${SANDBOX_PRECOMPILED:-}" == 1 ]] || ! command -v dart >/dev/null 2>&1; then
+  run_precompiled() {
+    repository="${SANDBOX_RELEASES:-specht/sorting-sandbox}"
+    downloads="${SANDBOX_DOWNLOADS:-https://github.com/$repository/releases/download}"
+    fail() {
+      echo "$1" >&2
+      echo 'Alternatively install the Dart SDK (https://dart.dev/get-dart) and run ./run again.' >&2
+      exit 1
+    }
+
+    case "$(uname -s)" in
+      Linux) os=linux ;;
+      Darwin) os=macos ;;
+      *) fail "No precompiled app for $(uname -s); use run.cmd on Windows." ;;
+    esac
+    case "$(uname -m)" in
+      x86_64|amd64) arch=x64 ;;
+      arm64|aarch64) arch=arm64 ;;
+      *) fail "No precompiled app for $(uname -m) processors." ;;
+    esac
+
+    # The version of the app: the Git objects of everything the app is built
+    # from (the same key as in the workflow and in run.cmd).
+    if ! key="$(git ls-tree HEAD tool lib pubspec.yaml pubspec.lock 2>/dev/null | git hash-object --stdin 2>/dev/null)" || [[ -z "$key" ]]; then
+      fail 'Cannot determine the app version: this folder must be a Git clone of the app.'
+    fi
+    tag="host-${key:0:16}"
+    name="sandbox-host-$os-$arch"
+    binary="runtime/host/$tag/$name"
+
+    if [[ ! -x "$binary" ]]; then
+      url="$downloads/$tag/$name"
+      echo "No Dart SDK found. Downloading the app for this computer ($os, $arch)…"
+      mkdir -p "runtime/host/$tag"
+      if command -v curl >/dev/null 2>&1; then
+        curl -fL --progress-bar -o "$binary.part" "$url" || { rm -f "$binary.part"; fail "Download failed: $url
+(GitHub builds the app a few minutes after each change of the app; try again later.)"; }
+      elif command -v wget >/dev/null 2>&1; then
+        wget -q --show-progress -O "$binary.part" "$url" || { rm -f "$binary.part"; fail "Download failed: $url
+(GitHub builds the app a few minutes after each change of the app; try again later.)"; }
+      else
+        fail "Neither curl nor wget is installed. Download $url to $binary yourself."
+      fi
+      chmod +x "$binary.part"
+      mv "$binary.part" "$binary"
+      # Older versions of the app are no longer needed.
+      for old in runtime/host/host-*; do
+        [[ "$old" == "runtime/host/$tag" ]] || rm -rf "$old"
+      done
+    fi
+    exec "$binary" "$@"
+  }
+  run_precompiled "$@"
 fi
 
 # Resolve the app's own dependencies only when they changed.

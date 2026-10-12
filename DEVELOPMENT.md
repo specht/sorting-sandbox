@@ -155,6 +155,22 @@ of that language show an explanation. Python runs with `-I -B`.
 (`language:` in `.settings.yaml`), the student's newest file, the class
 majority, then Dart.
 
+## Without a Dart SDK
+
+`./run` (and `run.cmd` on Windows) uses the Dart SDK when one is installed,
+exactly as before. Without one it starts the host compiled with
+`dart compile exe`: `.github/workflows/host.yml` builds it for Linux, macOS
+(x64, arm64) and Windows on every push and attaches it to a prerelease
+`host-<key>`, where the key is the first 16 hex digits of
+`git ls-tree HEAD tool lib pubspec.yaml pubspec.lock | git hash-object --stdin`.
+The scripts compute the same key, download the matching program once into
+`runtime/host/` and remove older ones. Python, JavaScript and Java work as
+usual; `.dart` algorithms report that the Dart SDK is missing
+(`DartToolchain` in `tool/languages.dart`, which is the running `dart` under
+`dart run`). `SANDBOX_PRECOMPILED=1 ./run` tries this path on a computer
+with Dart; `SANDBOX_RELEASES=owner/repo` uses the releases of a fork.
+`new-algorithm.cmd` runs `./new-algorithm` with the bash of Git for Windows.
+
 ## Browser protocol (WebSocket `/ws`)
 
 Client → host: `readSource`, `saveSource`, `formatSource`, `visualStart`,

@@ -1,0 +1,7 @@
+# Windows checkouts must keep the shell scripts' line endings (bash, also
+# Git Bash, cannot run them with CRLF), and the .cmd files need CRLF.
+run text eol=lf
+check text eol=lf
+new-algorithm text eol=lf
+*.sh text eol=lf
+*.cmd text eol=crlf

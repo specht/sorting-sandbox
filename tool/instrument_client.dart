@@ -4,6 +4,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'languages.dart' show dartToolchain;
+
 /// A problem in the student's source: shown in the editor, never retried.
 class StudentDiagnosticsException implements Exception {
   StudentDiagnosticsException(this.message, this.diagnostics);
@@ -29,7 +31,7 @@ class InstrumentClient {
     Future<List<String>> Function()? command,
     this.label = 'instrumenter',
   }) : _command = command ??
-            (() async => [Platform.resolvedExecutable, 'run', 'tool/instrument_daemon.dart']);
+            (() async => [await dartToolchain.executable(), 'run', 'tool/instrument_daemon.dart']);
 
   final Future<List<String>> Function() _command;
 

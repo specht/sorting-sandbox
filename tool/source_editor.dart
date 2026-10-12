@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'catalog.dart';
+import 'languages.dart' show dartToolchain;
 
 File editableSource(AlgorithmFile algorithm, String repoPath) {
   final file = File(algorithm.path);
@@ -78,7 +79,7 @@ void checkDraftSize(String content) {
 /// file. (Other languages are formatted by their daemon, see host.dart.)
 Future<String> formatDraft(String sourcePath, String content) async {
   checkDraftSize(content);
-  final process = await Process.start(Platform.resolvedExecutable,
+  final process = await Process.start(await dartToolchain.executable(),
       ['format', '--output=show', '--stdin-name=$sourcePath']);
   final formattedOutput = process.stdout.transform(utf8.decoder).join();
   final errorOutput = process.stderr.transform(utf8.decoder).join();

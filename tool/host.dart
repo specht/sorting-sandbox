@@ -754,9 +754,18 @@ Future<void> _main(List<String> args) async {
         '  git clone <class-repository-url> $repoPath\n'
         'The app picks it up automatically once it exists.');
   }
-  unawaited(instrumenter.warm().catchError((Object error) {
-    stderr.writeln('[instrumenter] Startup failed: $error');
-  }));
+  unawaited(() async {
+    if (!await dartToolchain.available()) {
+      stdout.writeln('[dart] No Dart SDK found: .dart algorithms cannot be built; '
+          'Python, JavaScript and Java algorithms work as usual.');
+      return;
+    }
+    try {
+      await instrumenter.warm();
+    } catch (error) {
+      stderr.writeln('[instrumenter] Startup failed: $error');
+    }
+  }());
   catalog.scan();
   Timer.periodic(const Duration(milliseconds: 700), (_) {
     try {
