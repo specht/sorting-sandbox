@@ -3,7 +3,8 @@
 A classroom sorting-algorithm visualizer, race arena and analyzer that runs in
 the browser and needs only the **Dart SDK** (3.11+). There is no Flutter and no
 build step for the UI: a Dart host serves plain HTML/CSS/JavaScript and runs
-student code in separate Dart worker processes.
+student code in separate worker processes. Students write in **Dart or
+Python** (3.10+, only needed by those who choose it); see "Languages" below.
 
 The central rule is unchanged: **students write ordinary sorting code**. They
 add no animation calls, yields, benchmark hooks, stability metadata or
@@ -13,7 +14,7 @@ variable tracing; the sandbox builds all of that around their source.
 
 ```text
 run                     start the app (dart pub get on demand, then tool/host.dart)
-new-algorithm           create algorithms/STUDENT/NAME.dart from templates/
+new-algorithm           create algorithms/STUDENT/NAME.dart|.py from templates/
 update-algorithms       git pull in the nested class repository
 check                   analysis + all tests
 packages/sorting_sandbox_api/   the tiny student-facing API (Elements, Colors, …)
@@ -30,11 +31,14 @@ tool/
   instrumenter.dart       creates the async "visual" copy with checkpoints
   instrument_daemon.dart  keeps the parser loaded (instrument_client.dart talks to it)
   source_editor.dart      revision-checked browser saves and `dart format`
-  settings.dart           local .settings.yaml (the theme), /api/settings
+  languages.dart          the student languages (by file extension), Python discovery
+  settings.dart           local .settings.yaml (theme, last chosen language), /api/settings
   light-theme.mjs         generates web/light.css from web/style.css (Node)
 web/                      index.html, style.css, light.css, js/*.js, vendored CodeMirror/fonts/icons
-templates/                Bubble Sort example and an empty template
-test/                     plain `dart run` / `node` tests (no extra packages)
+languages/python/         Python API (sorting_sandbox), worker and check/format daemon
+vendor/python/            vendored pure-Python tools: black, pyflakes (see its README)
+templates/                Bubble Sort example and an empty template per language
+test/                     plain `dart run` / `node` / `python3` / `bash` tests
 ```
 
 `algorithms/` is the class repository, a **separate Git repository** nested in
@@ -108,6 +112,34 @@ run that reaches no checkpoint for 4 seconds is killed (90 seconds while
 replaying to an earlier step); checks and analyses have hard timeouts of 20
 and 12 seconds. A crashed worker never affects the host.
 
+## Languages
+
+A file's extension is its language (`tool/languages.dart`); the class has no
+language setting and Dart and Python files race each other in one browser.
+Catalog ids stay `student/name` for Dart and keep the extension otherwise
+(`student/name.py`). Every language provides the same three pieces:
+
+| | Dart | Python |
+| --- | --- | --- |
+| check on save | parser daemon (`tool/instrument_daemon.dart`) | `languages/python/sandbox_daemon.py` (`ast`) |
+| build | instrumented copy + kernel | contract + pyflakes; byte-identical copy |
+| worker | generated kernel (`lib/worker_core.dart`) | `languages/python/sandbox_worker.py` |
+| lines and locals | checkpoints inserted into a copy | `sys.settrace`, no copy needed |
+| Format | `dart format` | vendored `black` in the daemon |
+
+All workers speak the same JSON-lines protocol (`visualStart`, `advance`,
+`run`), so the host, the judge and the browser do not know the language. The
+Python API counts operations exactly like the Dart one (`a[i]` one read,
+`a[i] = x` one write, each comparison one comparison, `swap` two reads and two
+writes); negative indices are errors, not wrap-around. Python runs with
+`-I -B` and gets three times the Check/Analyze time limits.
+
+Python is found as `$SANDBOX_PYTHON`, `python3`, `python` (or `py -3` on
+Windows) and must be 3.10 or newer. Without it, only `.py` files show an
+explanation. `./new-algorithm` picks the language from `--lang` or the file
+extension, otherwise from the last explicit choice (`language:` in
+`.settings.yaml`), the student's newest file, the class majority, then Dart.
+
 ## Browser protocol (WebSocket `/ws`)
 
 Client → host: `readSource`, `saveSource`, `formatSource`, `visualStart`,
@@ -125,7 +157,9 @@ Host → client: `catalog` (all files with status and diagnostics), `sourceFile`
 
 runs `dart analyze` on `lib`, `tool` and `test`, the API package tests, the
 runtime/instrumenter/parser tests, an end-to-end smoke test that compiles real
-workers and talks to them, and the Node tests for browser helpers.
+workers (Dart and Python) and talks to them, the Python worker/daemon tests
+(when Python 3.10+ is installed), the `new-algorithm` tests and the Node tests
+for browser helpers.
 
 ## Limits
 

@@ -10,6 +10,7 @@ import 'package:crypto/crypto.dart';
 import 'build.dart';
 import 'inspect.dart' show AlgorithmMeta;
 import 'instrument_client.dart';
+import 'languages.dart';
 
 // Student folders and file names as they occur in class repositories:
 // letters, digits, '_', '-' and '.', e.g. liu.kashiwabara/ or even a folder
@@ -28,13 +29,21 @@ class AlgorithmFile {
     required this.student,
     required this.relativePath,
     required this.path,
+    required this.stem,
+    this.language = Language.dart,
   });
 
-  /// `student/name` (the file path without `.dart`).
+  /// `student/name` for Dart files (the path without `.dart`, as always);
+  /// other languages keep their extension, e.g. `student/name.py`, so that
+  /// quick_sort.dart and quick_sort.py of one student are different entries.
   final String id;
   final String student;
   final String relativePath;
   final String path;
+
+  /// The file name without its extension, e.g. `quick_sort`.
+  final String stem;
+  final Language language;
 
   int size = -1;
   DateTime modified = DateTime.fromMillisecondsSinceEpoch(0);
@@ -54,12 +63,13 @@ class AlgorithmFile {
   bool retryable = false;
 
   String get author => meta?.author ?? student;
-  String get displayName => meta?.name ?? _prettyName(id.split('/').last);
+  String get displayName => meta?.name ?? _prettyName(stem);
 
   Map<String, Object?> toJson() => {
     'id': id,
     'student': student,
     'path': relativePath,
+    'language': language.id,
     'revision': revision,
     'name': displayName,
     'author': author,
@@ -120,17 +130,25 @@ class Catalog {
         rootPath = rootPath.substring(0, rootPath.length - 1);
       }
       for (final entity in root.listSync(recursive: true, followLinks: false)) {
-        if (entity is! File || !entity.path.endsWith('.dart')) continue;
+        if (entity is! File) continue;
+        final language = Language.forPath(entity.path);
+        if (language == null) continue;
         final relative = entity.absolute.path.substring(rootPath.length + 1);
         final segments = relative.split(Platform.pathSeparator);
         if (segments.length < 2 || !studentName.hasMatch(segments.first)) continue;
         if (segments.any((segment) => segment.startsWith('.'))) continue;
-        final stems = [
-          ...segments.sublist(0, segments.length - 1),
-          segments.last.substring(0, segments.last.length - '.dart'.length),
-        ];
+        final stem = segments.last
+            .substring(0, segments.last.length - language.extension.length);
+        final stems = [...segments.sublist(0, segments.length - 1), stem];
         if (!stems.every(_fileSegment.hasMatch)) continue;
-        final id = stems.join('/');
+        // Python caches and virtual environments are never algorithms.
+        if (segments.any((segment) => segment == '__pycache__' ||
+            segment == 'venv' || segment == 'site-packages')) {
+          continue;
+        }
+        final id = language == Language.dart
+            ? stems.join('/')
+            : '${stems.join('/')}${language.extension}';
         seen.add(id);
         final file = files.putIfAbsent(id, () {
           changed = true;
@@ -139,6 +157,8 @@ class Catalog {
             student: segments.first,
             relativePath: segments.join('/'),
             path: entity.absolute.path,
+            stem: stem,
+            language: language,
           );
         });
         if (_refreshFromDisk(file)) changed = true;
@@ -203,7 +223,7 @@ class Catalog {
   }
 
   Future<void> _inspect(AlgorithmFile file, String revision) async {
-    final key = builder.keyFor(file.bytes);
+    final key = builder.keyFor(file.bytes, language: file.language);
     final cached = builder.cached(key);
     if (cached is BuiltAlgorithm) {
       file
@@ -242,7 +262,8 @@ class Catalog {
       return false;
     }
     try {
-      final result = await instrumenter.inspect(file.path, content);
+      final result =
+          await builder.daemonFor(file.language).inspect(file.path, content);
       if (file.revision != revision) return false;
       final meta = AlgorithmMeta.fromJson(result['meta']);
       if (meta != null) file.meta = meta;
@@ -258,7 +279,9 @@ class Catalog {
       if (file.revision == revision && file.built == null) {
         file
           ..status = 'error'
-          ..message = 'The sandbox could not check this file: $error'
+          ..message = error is ToolchainMissing
+              ? error.message
+              : 'The sandbox could not check this file: $error'
           ..retryable = true
           ..diagnostics = const [];
       }
@@ -302,7 +325,7 @@ class Catalog {
       onChanged();
     }
     try {
-      final built = await builder.build(bytes, subject: id);
+      final built = await builder.build(bytes, subject: id, language: file.language);
       if (file.revision == revision) {
         file
           ..built = built

@@ -23,6 +23,8 @@
     restart.
 15. Students can edit, save and format their file in the browser; errors are
     shown at their own source lines.
+16. Students choose their language (Dart or Python) per file; the teacher
+    sets nothing. All languages are counted, judged and visualized alike.
 
 ## Repository boundary
 
@@ -65,7 +67,16 @@ in progress keeps its old worker process; the next run uses the new build. The
 browser notices that the source of a visualization changed and asks the
 student to run it again.
 
-## Two generated execution forms
+## Languages
+
+Only the worker and the source checks differ per language. The judge
+(`lib/judge.dart`), the host and the browser see one protocol. Python needs
+neither generated form below: `sys.settrace` delivers each executed line of the
+student's file with its locals (the visual form), and without a tracer the very
+same code runs at full speed (the benchmark form). A checkpoint blocks on stdin
+until the host grants budget; Stop kills the process as for Dart.
+
+## Two generated execution forms (Dart)
 
 ### Benchmark form
 

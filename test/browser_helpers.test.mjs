@@ -4,6 +4,7 @@ import {compactCount, makeInput, sortAlgorithms, formatList} from '../web/js/uti
 import {linearTicks, formatScore} from '../web/js/analyze.js';
 import {stabilityLabels} from '../web/js/explore.js';
 import {disambiguate} from '../web/js/catalog.js';
+import {LANGUAGES, commentEdits, fileStem, languageOf} from '../web/js/languages.js';
 
 let passed = 0;
 function test(name, body) {
@@ -65,6 +66,39 @@ test('two versions of one algorithm by the same student stay distinguishable', (
     {id: 'Ovilli/merge-sort', path: 'Ovilli/merge-sort.dart', name: 'Merge Sort', author: 'Ovilli'},
   ]);
   assert.deepEqual(list.map(a => a.name), ['Merge Sort (merge_sort)', 'Merge Sort (merge_sort_try)', 'Merge Sort']);
+});
+
+test('versions in different languages are told apart by their file name', () => {
+  const list = disambiguate([
+    {id: 'anna/quick_sort', path: 'anna/quick_sort.dart', name: 'Quick Sort', author: 'anna'},
+    {id: 'anna/quick_sort_iterative.py', path: 'anna/quick_sort_iterative.py', name: 'Quick Sort', author: 'anna'},
+  ]);
+  assert.deepEqual(list.map(a => a.name), ['Quick Sort (quick_sort)', 'Quick Sort (quick_sort_iterative)']);
+  assert.equal(fileStem('a/b/merge.py'), 'merge');
+  assert.equal(fileStem('a/merge.dart'), 'merge');
+  assert.equal(fileStem('a/notes.txt'), 'notes.txt');
+});
+
+test('a catalog entry selects its editor language, Dart by default', () => {
+  assert.equal(languageOf({language: 'python'}).mode, 'python');
+  assert.equal(languageOf({language: 'python'}).indent, 4);
+  assert.equal(languageOf({}), LANGUAGES.dart);
+  assert.equal(languageOf(null), LANGUAGES.dart);
+});
+
+test('line comments toggle with the language comment token', () => {
+  const lines = [{text: '    x = 1', indent: 4}, {text: '  y', indent: 2}];
+  assert.deepEqual(commentEdits(lines, '#'), [
+    {index: 0, from: 4, to: 4, insert: '# '},
+    {index: 1, from: 2, to: 2, insert: '# '},
+  ]);
+  const commented = [{text: '    # x = 1', indent: 4}, {text: '  #y', indent: 2}];
+  assert.deepEqual(commentEdits(commented, '#'), [
+    {index: 0, from: 4, to: 6, insert: ''},
+    {index: 1, from: 2, to: 3, insert: ''},
+  ]);
+  const mixed = [{text: '// a', indent: 0}, {text: 'b', indent: 0}];
+  assert.deepEqual(commentEdits(mixed, '//').map(e => e.insert), ['// ', '// ']);
 });
 
 console.log(`${passed} browser helper tests passed.`);

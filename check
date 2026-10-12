@@ -27,6 +27,20 @@ dart run test/inspect_test.dart
 echo "==> End-to-end: build and run the templates in real worker processes"
 dart run test/smoke_test.dart
 
+python=""
+for candidate in "${SANDBOX_PYTHON:-}" python3 python; do
+  if [[ -n "$candidate" ]] && "$candidate" -c 'import sys; sys.exit(sys.version_info < (3, 10))' 2>/dev/null; then
+    python="$candidate"
+    break
+  fi
+done
+if [[ -n "$python" ]]; then
+  echo "==> Python worker, checks and formatter"
+  "$python" -I -B test/python_worker_test.py
+else
+  echo "(no Python 3.10+ found: skipping the Python worker tests)"
+fi
+
 if command -v node >/dev/null 2>&1; then
   echo "==> Browser helper tests"
   for t in test/*.test.mjs; do node "$t"; done

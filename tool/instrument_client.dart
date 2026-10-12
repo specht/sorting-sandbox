@@ -22,6 +22,20 @@ class InstrumenterUnavailable implements Exception {
 }
 
 class InstrumentClient {
+  /// The Dart parser daemon (tool/instrument_daemon.dart). Other languages
+  /// pass the command of their own daemon, which speaks the same protocol
+  /// (e.g. languages/python/sandbox_daemon.py).
+  InstrumentClient({
+    Future<List<String>> Function()? command,
+    this.label = 'instrumenter',
+  }) : _command = command ??
+            (() async => [Platform.resolvedExecutable, 'run', 'tool/instrument_daemon.dart']);
+
+  final Future<List<String>> Function() _command;
+
+  /// Prefix of this daemon's lines in the terminal.
+  final String label;
+
   Process? _process;
   Future<void>? _starting;
   Completer<void>? _greeting;
@@ -58,6 +72,12 @@ class InstrumentClient {
         'out': outDirectory,
       }, throwOnStudentError: true);
 
+  /// Formats an editor draft (daemons of languages without a formatter
+  /// command of their own). Returns `{ok, content}` or `{ok: false, error}`.
+  Future<Map<String, dynamic>> format(String path, String content) =>
+      _request({'op': 'format', 'path': path, 'content': content},
+          throwOnStudentError: false);
+
   Future<void> _ensureStarted() {
     if (_ready && _process != null) return Future<void>.value();
     return _starting ??= _start().whenComplete(() {
@@ -67,15 +87,17 @@ class InstrumentClient {
 
   Future<void> _start() async {
     final greeting = Completer<void>();
+    // May throw a subclass of InstrumenterUnavailable (toolchain missing).
+    final command = await _command();
     late final Process process;
     try {
       process = await Process.start(
-        Platform.resolvedExecutable,
-        ['run', 'tool/instrument_daemon.dart'],
+        command.first,
+        command.sublist(1),
         workingDirectory: Directory.current.path,
       );
     } catch (error) {
-      throw InstrumenterUnavailable('Cannot start the instrumenter: $error');
+      throw InstrumenterUnavailable('Cannot start the $label: $error');
     }
     _process = process;
     _greeting = greeting;
@@ -102,28 +124,28 @@ class InstrumentClient {
                 }
               }
             } catch (_) {
-              stderr.writeln('[instrumenter] $line');
+              stderr.writeln('[$label] $line');
             }
           },
           onError: (Object error) => _lost(process, error),
           onDone: () => _lost(process, 'stdout closed'),
         );
     process.stderr.transform(utf8.decoder).listen((text) {
-      stderr.write('[instrumenter] $text');
+      stderr.write('[$label] $text');
     });
     unawaited(process.exitCode
         .then((code) => _lost(process, 'process exited with code $code')));
     try {
       await greeting.future.timeout(const Duration(seconds: 90));
       if (!identical(_process, process)) {
-        throw InstrumenterUnavailable('Instrumenter exited during startup.');
+        throw InstrumenterUnavailable('The $label exited during startup.');
       }
       _ready = true;
     } catch (error) {
       _lost(process, error);
       process.kill();
       if (error is InstrumenterUnavailable) rethrow;
-      throw InstrumenterUnavailable('Instrumenter startup failed: $error');
+      throw InstrumenterUnavailable('The $label could not start: $error');
     }
   }
 

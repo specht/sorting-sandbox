@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
-/// Local settings of this installation (for now: the theme). They live in
+/// Local settings of this installation: the theme (here) and the language
+/// last chosen with ./new-algorithm (written by that script). They live in
 /// .settings.yaml next to the app, which Git ignores, so they never end up in
 /// the app's repository or in the class repository. Only simple
 /// `key: value` lines are read; other lines are kept as they are.

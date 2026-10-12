@@ -1,5 +1,6 @@
 // The algorithm catalog pushed by the host, plus the picker used in Explore.
 import {el, icon, sortAlgorithms} from './util.js';
+import {fileStem, languageOf} from './languages.js';
 
 export class CatalogStore {
   constructor(connection) {
@@ -44,7 +45,7 @@ export function disambiguate(algorithms) {
   for (const algorithm of algorithms) counts.set(key(algorithm), (counts.get(key(algorithm)) ?? 0) + 1);
   for (const algorithm of algorithms) {
     if (counts.get(key(algorithm)) > 1) {
-      const file = String(algorithm.path ?? algorithm.id).split('/').pop().replace(/\.dart$/, '');
+      const file = fileStem(algorithm.path ?? algorithm.id);
       algorithm.name = `${algorithm.name} (${file})`;
     }
   }
@@ -68,6 +69,17 @@ export function statusIcon(algorithm) {
 }
 
 export const swatch = color => el('span', {class: 'swatch', style: `--swatch:${color}`});
+
+/** True when the class writes in more than one language. */
+export const mixedLanguages = algorithms =>
+  new Set(algorithms.map(algorithm => languageOf(algorithm).id)).size > 1;
+
+/** A small "Python" tag, shown only when the class mixes languages. */
+export function languageTag(algorithm, algorithms) {
+  return mixedLanguages(algorithms)
+    ? el('span', {class: 'picker-language'}, languageOf(algorithm).label)
+    : null;
+}
 
 /** A searchable dropdown of all algorithms, in teaching-family order. */
 export class AlgorithmPicker {
@@ -165,6 +177,8 @@ export class AlgorithmPicker {
       this.button.append(swatch(algorithm.color),
         el('span', {class: 'picker-name'}, algorithm.name),
         el('span', {class: 'picker-author'}, algorithm.author));
+      const tag = languageTag(algorithm, this.store.list);
+      if (tag) this.button.append(tag);
       const status = statusIcon(algorithm);
       if (status) this.button.append(status);
     }
@@ -175,7 +189,8 @@ export class AlgorithmPicker {
   renderOptions() {
     const query = this.filter.value.trim().toLowerCase();
     this.filtered = this.store.list.filter(algorithm => !query ||
-      `${algorithm.name} ${algorithm.author} ${algorithm.id}`.toLowerCase().includes(query));
+      `${algorithm.name} ${algorithm.author} ${algorithm.id} ${languageOf(algorithm).label}`
+        .toLowerCase().includes(query));
     if (this.active >= this.filtered.length) this.active = Math.max(0, this.filtered.length - 1);
     this.options.replaceChildren(...this.filtered.map((algorithm, index) => {
       const option = el('div', {
@@ -191,6 +206,8 @@ export class AlgorithmPicker {
       }, swatch(algorithm.color),
       el('span', {class: 'picker-name'}, algorithm.name),
       el('span', {class: 'picker-author'}, algorithm.author));
+      const tag = languageTag(algorithm, this.store.list);
+      if (tag) option.append(tag);
       const status = statusIcon(algorithm);
       if (status) option.append(status);
       option.append(el('span', {class: 'picker-check'}, algorithm.id === this.value ? icon('check') : null));

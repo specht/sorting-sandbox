@@ -11,6 +11,7 @@ import 'package:sorting_sandbox/judge.dart';
 import 'build.dart';
 import 'catalog.dart';
 import 'instrument_client.dart';
+import 'languages.dart';
 import 'source_editor.dart';
 import 'settings.dart';
 
@@ -89,10 +90,15 @@ class WorkerProcess {
 
   bool get dead => _gone;
 
-  static Future<WorkerProcess> start(String kernelPath) async {
+  /// A Dart worker kernel (tests).
+  static Future<WorkerProcess> start(String kernelPath) =>
+      launch([Platform.resolvedExecutable, kernelPath]);
+
+  /// A worker of any language: see [BuiltAlgorithm.launchCommand].
+  static Future<WorkerProcess> launch(List<String> command) async {
     final process = await Process.start(
-      Platform.resolvedExecutable,
-      [kernelPath],
+      command.first,
+      command.sublist(1),
       workingDirectory: Directory.current.path,
     );
     final worker = WorkerProcess._(process);
@@ -192,7 +198,7 @@ class CaseSession {
   int _next = 0;
 
   static Future<CaseSession> start(BuiltAlgorithm built) async =>
-      CaseSession._(await WorkerProcess.start(built.kernelPath));
+      CaseSession._(await WorkerProcess.launch(await built.launchCommand()));
 
   Future<CaseResult> run(List<int> values) async {
     final exited = _exited;
@@ -382,7 +388,18 @@ class Client {
       if (algorithm == null || content is! String || requestId is! int) {
         throw const FormatException('Invalid format request.');
       }
-      final formatted = await formatDraft(algorithm.path, content);
+      final String formatted;
+      if (algorithm.language == Language.python) {
+        checkDraftSize(content);
+        final reply = await builder.python.format(algorithm.path, content);
+        if (reply['ok'] != true || reply['content'] is! String) {
+          throw FormatException(
+              reply['error']?.toString() ?? 'Python could not format this draft.');
+        }
+        formatted = reply['content'] as String;
+      } else {
+        formatted = await formatDraft(algorithm.path, content);
+      }
       send({'type': 'sourceFormatted', ...response, 'content': formatted});
     } catch (error) {
       final text = error is FormatException ? error.message : '$error';
@@ -451,7 +468,7 @@ class Client {
 
     final WorkerProcess worker;
     try {
-      worker = await WorkerProcess.start(built.kernelPath);
+      worker = await WorkerProcess.launch(await built.launchCommand());
     } catch (error) {
       if (!run.cancelled) _runError(run, {'kind': 'crash', 'message': '$error'});
       return;
@@ -627,13 +644,14 @@ class Client {
       return {'revision': null, 'result': {'status': 'missing', 'message': 'This algorithm no longer exists.'}};
     }
     final revision = algorithm.revision;
+    final limit = algorithm.language.scaled(timeout);
     try {
       final built = await catalog.ensureBuilt(id);
       if (job.cancelled) return {'revision': revision, 'result': {'status': 'cancelled'}};
       final result = await judgeInWorker(
         built,
         judge,
-        timeout: timeout,
+        timeout: limit,
         register: job.track,
       );
       return {'revision': revision, 'result': {'status': 'done', ...result}};
@@ -657,7 +675,7 @@ class Client {
         'revision': revision,
         'result': {
           'status': 'timeout',
-          'message': 'Did not finish within ${timeout.inSeconds} seconds.',
+          'message': 'Did not finish within ${limit.inSeconds} seconds.',
         },
       };
     } catch (error) {

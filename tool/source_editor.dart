@@ -67,11 +67,17 @@ Map<String, Object?> saveEditableSource(
   };
 }
 
-/// Formats an editor draft through stdin. Never writes the student's file.
-Future<String> formatDraft(String sourcePath, String content) async {
+/// Rejects drafts that no formatter should see.
+void checkDraftSize(String content) {
   if (utf8.encode(content).length > maxSourceBytes || content.contains('\u0000')) {
     throw const FormatException('Source must be UTF-8 text smaller than 256 KiB.');
   }
+}
+
+/// Formats a Dart editor draft through stdin. Never writes the student's
+/// file. (Python drafts are formatted by the Python daemon, see host.dart.)
+Future<String> formatDraft(String sourcePath, String content) async {
+  checkDraftSize(content);
   final process = await Process.start(Platform.resolvedExecutable,
       ['format', '--output=show', '--stdin-name=$sourcePath']);
   final formattedOutput = process.stdout.transform(utf8.decoder).join();

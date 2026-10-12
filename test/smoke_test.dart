@@ -12,6 +12,7 @@ import 'package:sorting_sandbox/judge.dart';
 
 import '../tool/host.dart' show WorkerProcess, judgeInWorker;
 import '../tool/instrument_client.dart';
+import '../tool/languages.dart';
 import 'harness.dart';
 
 final instrumenter = InstrumentClient();
@@ -20,13 +21,27 @@ var _unique = DateTime.now().microsecondsSinceEpoch;
 
 /// A distinct comment defeats the worker cache, so every run really compiles.
 List<int> source(String text) => utf8.encode('$text\n// smoke ${_unique++}\n');
+List<int> pythonSource(String text) => utf8.encode('$text\n# smoke ${_unique++}\n');
+
+/// Python tests are skipped (with a note) where no Python 3.10+ is installed.
+Future<bool> pythonAvailable() async {
+  try {
+    await pythonToolchain.command();
+    return true;
+  } on ToolchainMissing catch (missing) {
+    stdout.writeln('    (skipped: ${missing.message})');
+    return false;
+  }
+}
+
+const pythonHeader = 'from sorting_sandbox import Colors, Elements, SortingAlgorithm\n\n\n';
 
 const header = "import 'package:sorting_sandbox_api/sorting_sandbox_api.dart';\n";
 
 /// Runs a visual algorithm to the end in single steps.
 Future<({List<Map<String, dynamic>> frames, List<Map<String, dynamic>> console,
     Map<String, dynamic>? error})> runVisual(BuiltAlgorithm built, List<int> values) async {
-  final worker = await WorkerProcess.start(built.kernelPath);
+  final worker = await WorkerProcess.launch(await built.launchCommand());
   final frames = <Map<String, dynamic>>[];
   final console = <Map<String, dynamic>>[];
   final done = Completer<Map<String, dynamic>?>();
@@ -58,9 +73,10 @@ Future<({List<Map<String, dynamic>> frames, List<Map<String, dynamic>> console,
   }
 }
 
-Future<BuildFailure> expectFailure(List<int> bytes) async {
+Future<BuildFailure> expectFailure(List<int> bytes,
+    {Language language = Language.dart}) async {
   try {
-    await builder.build(bytes, subject: 'smoke');
+    await builder.build(bytes, subject: 'smoke', language: language);
   } on BuildFailure catch (failure) {
     return failure;
   }
@@ -185,6 +201,79 @@ class Merge extends SortingAlgorithm {
     expect(check['correct'], isTrue);
   });
 
+  test('a Python algorithm builds, runs step by step and is judged by the host', () async {
+    if (!await pythonAvailable()) return;
+    final built = await builder.build(
+        pythonSource(File('templates/bubble_sort.py').readAsStringSync()),
+        subject: 'smoke/bubble-python',
+        language: Language.python);
+    expect(built.meta.name, 'Bubble Sort');
+    expect(built.meta.color, '#4CAF50');
+    expect(built.language, Language.python);
+    final run = await runVisual(built, [3, 1, 2]);
+    expect(run.error, null);
+    expect(run.frames.last['numbers'], [1, 2, 3]);
+    expect((run.frames.last['metrics'] as Map)['comparisons'], 6,
+        reason: 'the same count as the Dart template');
+    final check = await judgeInWorker(built, checkCases,
+        timeout: const Duration(seconds: 60));
+    expect(check['correct'], isTrue);
+    expect((check['stability'] as Map)['stable'], isTrue);
+    final analysis = await judgeInWorker(
+        built,
+        (run) => analyzeCases(run, [
+              [4, 3, 2, 1],
+              [2, 1],
+            ]),
+        timeout: const Duration(seconds: 60));
+    expect(analysis['correct'], isTrue);
+    expect((analysis['benchmarks'] as List).length, 2);
+  });
+
+  test('Python problems come back with the line of the student file', () async {
+    if (!await pythonAvailable()) return;
+    final syntax = await expectFailure(
+        pythonSource('${pythonHeader}class Broken(SortingAlgorithm)\n    name = "B"\n'),
+        language: Language.python);
+    expect(syntax.diagnostics.first['line'], 4);
+    final typo = await expectFailure(pythonSource('''${pythonHeader}class Typo(SortingAlgorithm):
+    name = "Typo"
+    color = Colors.RED
+
+    def sort(self, elements, scratch):
+        elements.swap(0, lenght)
+'''), language: Language.python);
+    expect(typo.diagnostics.first['line'], 9);
+    expectContains(typo.diagnostics.first['message'].toString(), 'lenght');
+
+    final built = await builder.build(pythonSource('''${pythonHeader}class OffByOne(SortingAlgorithm):
+    name = "Off by one"
+    color = Colors.RED
+
+    def sort(self, elements, scratch):
+        print("start")
+        for i in range(len(elements) + 1):
+            if elements[i] > elements[0]:
+                elements.swap(i, 0)
+'''), subject: 'smoke/off-by-one-python', language: Language.python);
+    final run = await runVisual(built, [2, 1]);
+    expect(run.console.first['text'], 'start');
+    expect(run.console.first['line'], 9);
+    final error = run.error!['error'] as Map;
+    expect(error['line'], 11);
+    expectContains(error['message'].toString(), 'IndexError');
+    final check = await judgeInWorker(built, checkCases,
+        timeout: const Duration(seconds: 60));
+    expect(check['correct'], isFalse);
+  });
+
+  test('Python drafts are formatted by the vendored formatter', () async {
+    if (!await pythonAvailable()) return;
+    final reply = await builder.python.format('x.py', 'x=[1,2 ,3]\n');
+    expect(reply['ok'], isTrue);
+    expect(reply['content'], 'x = [1, 2, 3]\n');
+  });
+
   test('every algorithm of a real class repository is found', () async {
     final root = Directory.systemTemp.createTempSync('sorting-sandbox-catalog');
     final files = [
@@ -192,13 +281,15 @@ class Merge extends SortingAlgorithm {
       'klara_sort.dart/bubble_klara.dart', 'liu.kashiwabara/bubblesort.dart',
       'Ovilli/insertion-sort.dart', 'sebastian.marhoff/MgSort.dart',
       'Simon-Cat/QuickestSort.dart', 'HiTears/merge_sort_try.dart',
+      'anna/quick_sort.py', 'bob/merge_sort.py',
     ];
     for (final file in files) {
       File('${root.path}/$file')
         ..createSync(recursive: true)
         ..writeAsStringSync(File('templates/bubble_sort.dart').readAsStringSync());
     }
-    for (final ignored in ['README.md', 'pubspec.yaml', '.dart_tool/x/y.dart', 'top_level.dart']) {
+    for (final ignored in ['README.md', 'pubspec.yaml', '.dart_tool/x/y.dart', 'top_level.dart',
+        'top_level.py', 'anna/.venv/lib/x.py', 'anna/__pycache__/x.py', 'anna/notes.txt']) {
       File('${root.path}/$ignored')
         ..createSync(recursive: true)
         ..writeAsStringSync('// not an algorithm');
@@ -211,14 +302,20 @@ class Merge extends SortingAlgorithm {
     );
     catalog.scan();
     final ids = catalog.files.keys.toSet();
-    expect(ids, {for (final file in files) file.substring(0, file.length - '.dart'.length)});
+    expect(ids, {
+      for (final file in files)
+        file.endsWith('.dart') ? file.substring(0, file.length - '.dart'.length) : file,
+    });
     expect(catalog['liu.kashiwabara/bubblesort']!.student, 'liu.kashiwabara');
+    expect(catalog['anna/quick_sort.py']!.language, Language.python);
+    expect(catalog['anna/quick_sort.py']!.toJson()['language'], 'python');
+    expect(catalog['anna/quick_sort.py']!.displayName, 'Quick Sort');
     await Future<void>.delayed(const Duration(seconds: 2));
     root.deleteSync(recursive: true);
   });
 
   test('cleanup', () {
-    instrumenter.dispose();
+    builder.dispose();
     Timer(const Duration(milliseconds: 200), () => exit(exitCode));
   });
 }

@@ -1,13 +1,7 @@
-// The browser editor: bundled CodeMirror, revision-checked saves, Dart
+// The browser editor: bundled CodeMirror, revision-checked saves, language-aware
 // formatting and compiler diagnostics on the student's original lines.
 import {el, icon} from './util.js';
-
-const KEYWORDS = ['abstract', 'as', 'assert', 'bool', 'break', 'case', 'class', 'const',
-  'continue', 'do', 'double', 'dynamic', 'else', 'extends', 'false', 'final', 'for',
-  'if', 'import', 'in', 'int', 'is', 'late', 'List', 'null', 'return', 'static',
-  'String', 'super', 'switch', 'this', 'throw', 'true', 'var', 'void', 'while',
-  // Sorting Sandbox API
-  'Elements', 'Element', 'SortingAlgorithm', 'Colors', 'length', 'swap', 'scratch'];
+import {LANGUAGES, commentEdits, languageOf} from './languages.js';
 
 export class SourceEditor {
   constructor(connection, ui) {
@@ -32,6 +26,7 @@ export class SourceEditor {
     this.suggestions = [];
     this.suggestionIndex = 0;
     this.listeners = new Set();
+    this.language = LANGUAGES.dart;
 
     this.editor = CodeMirror(ui.container, {
       value: '', mode: 'dart', lineNumbers: true, lineWrapping: false,
@@ -118,6 +113,7 @@ export class SourceEditor {
     this.hideSuggestions();
     this.clearDiagnostics();
     this.algorithm = algorithm;
+    this.applyLanguage(languageOf(algorithm));
     this.id = algorithm?.id ?? null;
     this.revision = null;
     this.original = '';
@@ -270,7 +266,7 @@ export class SourceEditor {
       return;
     }
     if (message.type === 'sourceFormatError') {
-      this.setStatus(message.message || 'Dart could not format this draft.', true);
+      this.setStatus(message.message || `${this.language.label} could not format this draft.`, true);
       return;
     }
     if (message.content === this.editor.getValue()) {
@@ -298,17 +294,22 @@ export class SourceEditor {
       if (text.trim()) lines.push({line, text, indent: (text.match(/^\s*/) || [''])[0].length});
     }
     if (!lines.length) return;
-    const uncomment = lines.every(({text}) => /^\s*\/\//.test(text));
+    const edits = commentEdits(lines, this.language.comment);
     cm.operation(() => {
-      for (const {line, text, indent} of lines.reverse()) {
-        const start = {line, ch: indent};
-        if (uncomment) {
-          cm.replaceRange('', start, {line, ch: indent + (text.slice(indent).startsWith('// ') ? 3 : 2)}, '+comment');
-        } else {
-          cm.replaceRange('// ', start, start, '+comment');
-        }
+      for (const edit of [...edits].reverse()) {
+        const {line} = lines[edit.index];
+        cm.replaceRange(edit.insert, {line, ch: edit.from}, {line, ch: edit.to}, '+comment');
       }
     });
+  }
+
+  /** Mode, indentation and completion words of the selected file's language. */
+  applyLanguage(language) {
+    if (this.language === language) return;
+    this.language = language;
+    this.editor.setOption('mode', language.mode);
+    this.editor.setOption('indentUnit', language.indent);
+    this.editor.setOption('tabSize', language.indent);
   }
 
   // ------------------------------------------------------------- display
@@ -371,7 +372,7 @@ export class SourceEditor {
       const text = this.editor.getLine(line);
       const column = Math.max(0, Math.min(text.length, (issue.column || 1) - 1));
       const end = Math.min(text.length, column + Math.max(1, issue.length || 1));
-      const note = String(issue.message || 'Dart could not compile this line.');
+      const note = String(issue.message || `${this.language.label} could not compile this line.`);
       this.editor.addLineClass(line, 'background', 'source-error-line');
       const marker = end > column
         ? this.editor.markText({line, ch: column}, {line, ch: end}, {className: 'source-error-underline', title: note})
@@ -510,7 +511,7 @@ export class SourceEditor {
     const {cursor, prefix} = this.wordAtCursor(cm);
     if ((!explicit && prefix.length < 2) || cm.somethingSelected() ||
         /comment|string/.test(cm.getTokenAt(cursor).type || '')) return this.hideSuggestions();
-    const words = new Set(KEYWORDS);
+    const words = new Set(this.language.keywords);
     for (const word of cm.getValue().match(/[A-Za-z_][A-Za-z_0-9]*/g) || []) words.add(word);
     this.suggestions = [...words].filter(word => word.startsWith(prefix) && word !== prefix).sort().slice(0, 9);
     if (!this.suggestions.length) return this.hideSuggestions();

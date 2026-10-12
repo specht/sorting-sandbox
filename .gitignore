@@ -10,3 +10,4 @@ build/
 /runtime/
 # Local settings (the theme); they belong to this computer, not to Git.
 .settings.yaml
+__pycache__/
