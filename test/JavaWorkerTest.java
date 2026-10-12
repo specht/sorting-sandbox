@@ -97,9 +97,9 @@ public class JavaWorkerTest {
         Daemon() throws IOException {
             List<String> command = new ArrayList<>(List.of(javaCommand));
             command.addAll(EXPORTS);
-            command.addAll(List.of("-cp", runtime + File.pathSeparator
-                    + ROOT.resolve("vendor/java/google-java-format-1.35.0-all-deps.jar"),
-                    "__sandbox.Daemon", runtime.toString()));
+            command.addAll(List.of("-cp", runtime.toString(), "__sandbox.Daemon", runtime.toString(),
+                    ROOT.resolve("vendor/java/google-java-format-1.35.0-all-deps.jar").toString(),
+                    ROOT.resolve("vendor/java/google-java-format-1.28.0-all-deps.jar").toString()));
             process = new ProcessBuilder(command).redirectError(ProcessBuilder.Redirect.DISCARD).start();
             out = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
             in = new OutputStreamWriter(process.getOutputStream(), StandardCharsets.UTF_8);
@@ -188,7 +188,7 @@ public class JavaWorkerTest {
         try (Stream<Path> files = Files.walk(ROOT.resolve("languages/java/src"))) {
             sources = files.filter(p -> p.toString().endsWith(".java")).map(Path::toString).toList();
         }
-        List<String> javacArgs = new ArrayList<>(List.of("--release", "17", "-d", runtime.toString()));
+        List<String> javacArgs = new ArrayList<>(List.of("--release", "17", "-encoding", "UTF-8", "-d", runtime.toString()));
         javacArgs.addAll(sources);
         check(ToolProvider.getSystemJavaCompiler().run(null, null, null, javacArgs.toArray(String[]::new)) == 0,
                 "the runtime compiles with --release 17");

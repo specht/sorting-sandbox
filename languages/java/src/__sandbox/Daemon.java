@@ -6,14 +6,10 @@ import java.io.FileDescriptor;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * Keeps the Java compiler and formatter loaded between edits. One JSON request and one JSON reply
@@ -29,24 +25,26 @@ import java.util.regex.Pattern;
  * student's source into {@code out/benchmark} and the copy with checkpoints into {@code
  * out/visual}. This process never runs student code.
  *
- * <p>Started as {@code java … -cp RUNTIME:google-java-format.jar __sandbox.Daemon RUNTIME}.
+ * <p>Started as {@code java … -cp RUNTIME __sandbox.Daemon RUNTIME google-java-format-*.jar…}: the
+ * formatter jars are loaded on demand, the newest one that this JDK can run.
  */
 public final class Daemon {
     private final String runtimeClasspath;
-    private Object formatter;
+    private final JavaFormatter formatter;
 
-    private Daemon(String runtimeClasspath) {
+    private Daemon(String runtimeClasspath, List<String> formatterJars) {
         this.runtimeClasspath = runtimeClasspath;
+        this.formatter = new JavaFormatter(formatterJars);
     }
 
     public static void main(String[] args) throws Exception {
-        if (args.length != 1) {
-            System.err.println("usage: __sandbox.Daemon RUNTIME_CLASSES");
+        if (args.length < 1) {
+            System.err.println("usage: __sandbox.Daemon RUNTIME_CLASSES [GOOGLE_JAVA_FORMAT_JAR...]");
             System.exit(64);
         }
         PrintStream out = new PrintStream(new FileOutputStream(FileDescriptor.out), false, StandardCharsets.UTF_8);
         System.setOut(System.err); // Nothing but replies on the protocol channel.
-        Daemon daemon = new Daemon(args[0]);
+        Daemon daemon = new Daemon(args[0], List.of(args).subList(1, args.length));
         out.print(Json.write(Worker.message("type", "ready", "pid", ProcessHandle.current().pid())) + "\n");
         out.flush();
         BufferedReader in = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
@@ -120,40 +118,8 @@ public final class Daemon {
 
     // ------------------------------------------------------------------- formatting
 
-    private static final Pattern POSITION = Pattern.compile("^(\\d+):(\\d+): (?:error: )?(.*)$", Pattern.DOTALL);
-
-    /** google-java-format in AOSP style (four spaces), loaded by reflection. */
+    /** google-java-format in AOSP style (four spaces), see JavaFormatter. */
     private Map<String, Object> format(String content) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        try {
-            if (formatter == null) {
-                String base = "com.google.googlejavaformat.java.";
-                Class<?> options = Class.forName(base + "JavaFormatterOptions");
-                Class<?> builderType = Class.forName(base + "JavaFormatterOptions$Builder");
-                Class<?> style = Class.forName(base + "JavaFormatterOptions$Style");
-                Object builder = options.getMethod("builder").invoke(null);
-                @SuppressWarnings({"unchecked", "rawtypes"})
-                Object aosp = Enum.valueOf((Class) style, "AOSP");
-                builderType.getMethod("style", style).invoke(builder, aosp);
-                Object built = builderType.getMethod("build").invoke(builder);
-                formatter = Class.forName(base + "Formatter").getConstructor(options).newInstance(built);
-            }
-            Method formatSource = formatter.getClass().getMethod("formatSource", String.class);
-            result.put("ok", true);
-            result.put("content", formatSource.invoke(formatter, content));
-        } catch (InvocationTargetException error) {
-            Throwable cause = error.getCause() != null ? error.getCause() : error;
-            String message = String.valueOf(cause.getMessage());
-            Matcher matcher = POSITION.matcher(message.strip());
-            if (matcher.matches()) message = "line " + matcher.group(1) + ": " + matcher.group(3);
-            int newline = message.indexOf('\n');
-            if (newline > 0) message = message.substring(0, newline);
-            result.put("ok", false);
-            result.put("error", "Java could not format this draft: " + message);
-        } catch (ReflectiveOperationException | LinkageError error) {
-            result.put("ok", false);
-            result.put("error", "The Java formatter is not available: " + error);
-        }
-        return result;
+        return formatter.format(content);
     }
 }

@@ -41,6 +41,17 @@ function instrument(content, out) {
   return result;
 }
 
+// js-beautify puts every name of `import { a, b } from "x"` on a line of its
+// own; short lists go back on one line, the way students write them.
+const NAME_LIST = /^(import|export) \{\n((?:[ \t]+[^\n]*\n)+?)\}((?: from [^\n;]+)?)(;?)$/gm;
+function joinNameLists(text) {
+  return text.replace(NAME_LIST, (whole, keyword, names, from, semicolon) => {
+    const list = names.split('\n').map(name => name.trim()).filter(Boolean).join(' ');
+    const joined = `${keyword} { ${list} }${from}${semicolon}`;
+    return joined.length <= 100 ? joined : whole;
+  });
+}
+
 function format(content) {
   try {
     parse(content);
@@ -57,6 +68,7 @@ function format(content) {
     space_after_anon_function: false,
     brace_style: 'collapse',
   });
+  formatted = joinNameLists(formatted);
   if (!formatted.endsWith('\n')) formatted += '\n';
   return {ok: true, content: formatted};
 }

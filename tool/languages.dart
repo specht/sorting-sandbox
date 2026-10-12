@@ -273,7 +273,13 @@ final nodeToolchain = NodeToolchain();
 class JavaToolchain {
   static const minimum = 17;
   static const sourceDirectory = 'languages/java/src';
-  static const formatterJar = 'vendor/java/google-java-format-1.35.0-all-deps.jar';
+
+  /// The daemon uses the newest one this JDK can run: 1.35.0 needs JDK 21+,
+  /// 1.28.0 is the newest that formats on JDK 17 to 20 (vendor/java/README.md).
+  static const formatterJars = [
+    'vendor/java/google-java-format-1.35.0-all-deps.jar',
+    'vendor/java/google-java-format-1.28.0-all-deps.jar',
+  ];
 
   /// google-java-format uses the JDK's compiler internals.
   static const formatterExports = [
@@ -367,8 +373,6 @@ class JavaToolchain {
     return classes.absolute.path;
   }
 
-  String get _separator => Platform.isWindows ? ';' : ':';
-
   /// The checks, the compiler and the formatter (__sandbox.Daemon).
   Future<List<String>> daemon() async {
     final tools = await this.tools();
@@ -378,9 +382,10 @@ class JavaToolchain {
       ...formatterExports,
       '-XX:+UseSerialGC',
       '-cp',
-      '$classes$_separator${File(formatterJar).absolute.path}',
+      classes,
       '__sandbox.Daemon',
       classes,
+      for (final jar in formatterJars) File(jar).absolute.path,
     ];
   }
 

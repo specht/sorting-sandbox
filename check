@@ -46,7 +46,8 @@ java_bin="${java_bin:+$java_bin/bin/}"
 javac_version="$("${java_bin}javac" -version 2>&1 || true)"
 if grep -q -E 'javac (1[7-9]|[2-9][0-9])' <<< "$javac_version"; then
   echo "==> Java worker, instrumenter, checks and formatter"
-  "${java_bin}java" test/JavaWorkerTest.java
+  # JDK 17 reads source files in the locale's encoding; the test file is UTF-8.
+  "${java_bin}java" -Dfile.encoding=UTF-8 test/JavaWorkerTest.java
 else
   echo "(no JDK 17+ found: skipping the Java worker tests)"
 fi
