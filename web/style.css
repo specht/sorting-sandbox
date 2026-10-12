@@ -93,6 +93,16 @@ input[type=checkbox]{accent-color:#89baff}
 .source-editor .cm-number,.source-editor .cm-atom{color:#f2b98a}
 .source-editor .cm-comment{color:#7f97b6}
 .source-editor .cm-meta{color:#d6b98a}
+.source-editor .cm-builtin{color:#7fdbca}
+.source-editor .cm-qualifier{color:#d6b98a}
+.source-editor .cm-string-2{color:#d7e8a6}
+.source-editor .cm-property,.source-editor .cm-operator,.source-editor .cm-variable{color:#e8f0ff}
+.source-editor .cm-bracket,.source-editor .cm-hr,.source-editor .cm-link{color:#9fb3cf}
+.source-editor .cm-tag{color:#94d8ee}
+.source-editor .cm-attribute{color:#f2b98a}
+.source-editor .cm-header{color:#cbabff}
+.source-editor .cm-quote{color:#b6d992}
+.source-editor .cm-error{color:#ff8f8f}
 .source-editor .CodeMirror-matchingbracket{color:#fff!important;background:#3b5a86}
 .source-editor .source-execution-line{background:#2a5280a8}
 .source-editor .source-execution-line+.CodeMirror-gutter-wrapper .CodeMirror-linenumber{color:var(--gold)}
